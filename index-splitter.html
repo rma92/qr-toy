@@ -1,0 +1,234 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script type="text/javascript" src="qrcode-withraw.js"></script>
+<style>
+#qrcode
+{
+  border: 20px solid white;
+}
+#tab2
+{
+  display:none;
+}
+</style>
+</head>
+<body>
+<textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
+<table>
+<tr>
+<td>ECC Level:</td>
+<td>
+<select id="eccLevel">
+  <option value="L">L (7%)</option>
+  <option value="M">M (15%)</option>
+  <option value="Q">Q (25%)</option>
+  <option value="H">H (30%)</option>
+</select>
+</td>
+<td>
+Scale:
+</td>
+<td>
+<input type="number" id="scale" value="20" min="1" max="32"/>
+</td>
+<td>
+Length:
+</td>
+<td>
+<input id="strlen" type="text" readonly="true" value="-1" />
+</td>
+<td>
+Split Size:
+</td>
+<td>
+<input id="split_size" type="number" value="0" min=0 />
+</td>
+<td>
+Split Time:
+</td>
+<td>
+<input id="split_time" type="number" value="1000" /> ms
+</td>
+</tr>
+</table>
+
+<div id="tabbox">
+<button id=tab1butt>Image</button>
+<button id=tab2butt>Text</button>
+<div id=tab1>
+<canvas id="cOut" width="800" height="800" style="border:1px solid red;">
+</canvas>
+</div>
+<div id=tab2>
+<textarea id="textOut" style="width:500px;height:450px">
+</textarea>
+</div>
+
+</div>
+<script type="text/javascript">
+//var qrcode = new QRCode(document.getElementById("qrcode"), {});
+var qrcode;
+
+function initqr(correctLevel)
+{
+  var cL;
+  if( correctLevel == 'L' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.L
+    });
+  }
+  else if( correctLevel == 'M' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+  else if( correctLevel == 'Q' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.Q
+    });
+  }
+  else
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }
+
+}
+
+//calls initqr with the ecc code set based on the dropdown.
+function initqr_gui()
+{
+  
+  initqr( document.getElementById('eccLevel').value );
+}
+var pageid = -1;
+var numpages = 0;
+var chunks = [];
+
+/*
+function chunkSubstr(str, size) {
+  const numChunks = Math.ceil(str.length / size)
+  const chunks = new Array(numChunks)
+
+  for (let i = 0, o = 0; i < numChunks; ++i, o += size) {
+    chunks[i] = str.substr(o, size)
+  }
+
+  return chunks
+}
+*/
+ function stringChop (str, size){
+      if (str == null)
+         return [];
+         str = String(str);
+         return size > 0 ? str.match(new RegExp('.{1,' + size + '}', 'g')) : [str];
+   }
+
+function makeCode()
+{
+  if( document.getElementById('split_size').value == 0 )
+  {
+    var elText = document.getElementById("text");
+    var qStr = "";
+    if (elText.value) {
+      qStr = elText.value;
+    }
+    makeCodeInt( qStr );
+  }
+  else
+  {
+    if( chunks.length == 0 )
+    {
+      chunks = stringChop( document.getElementById("text").value, document.getElementById('split_size').value);
+    }
+    ++pageid;
+    if( pageid >= chunks.length ) pageid = 0;
+
+    qStr = "Q:" + pageid + ":" + chunks.length + "\n" + chunks[pageid];
+    console.log(qStr);
+    makeCodeInt( qStr );
+//    setTimeout( makeCode, document.getElementById('split_time').value );
+  }
+}
+
+function makeCodeInt (qStr) {
+
+
+  document.getElementById('strlen').value = qStr.length;
+  if( qStr.length > 12680 )
+  {
+    alert("Max length:\nH: 1268\n1663, 2331, 2953");
+    return;
+  }
+  var oStr = qrcode.makeCodeString(qStr);
+  document.getElementById('textOut').value = oStr;
+
+  var nC = qrcode._oQRCode.getModuleCount();
+  var scale = 2;
+  if( document.getElementById('scale').value )
+  {
+    scale = document.getElementById('scale').value;
+  }
+  var offsetX = 10;
+  var offsetY = 10;
+  var dCanvas = document.getElementById("cOut");
+    var ctx = dCanvas.getContext('2d');
+    ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+    for(var r = 0; r < nC; ++r)
+    {
+      for(var c = 0; c < nC; ++c)
+      {
+        if( qrcode._oQRCode.isDark(r,c) )
+        {
+          ctx.fillStyle = "black";
+        }
+        else
+        {
+          ctx.fillStyle = "white";
+        }
+        ctx.fillRect(r*scale+offsetX, c*scale+offsetY, scale, scale);
+      }
+    }
+  }
+
+initqr_gui();
+makeCode();
+
+var elText = document.getElementById('text');
+elText.addEventListener("blur",function()
+{
+  makeCode();
+});
+
+elText.addEventListener("input",function()
+{
+  makeCode();
+});
+document.getElementById('scale').addEventListener("input",function()
+{
+  makeCode();
+});
+document.getElementById('eccLevel').addEventListener("change",function()
+{
+  initqr_gui();
+  makeCode();
+  chunks = [];
+});
+document.getElementById('tab1butt').addEventListener("click",function()
+{
+  document.getElementById('tab1').style.display = "block";
+  document.getElementById('tab2').style.display = "none";
+});
+document.getElementById('tab2butt').addEventListener("click",function()
+{
+  document.getElementById('tab1').style.display = "none";
+  document.getElementById('tab2').style.display = "block";
+});
+</script>
+</body>
+</html>
