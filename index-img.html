@@ -1,0 +1,50 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<!--<script type="text/javascript" src="jquery.min.js"></script>-->
+<script type="text/javascript" src="qrcode-withraw.js"></script>
+<style>
+#qrcode
+{
+  border: 20px solid white;
+}
+</style>
+</head>
+<body>
+<textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
+<table>
+<tr>
+<td>Dimensions:</td>
+<td><input type="number"/>.<input type="number"/>.</td>
+<td>
+</tr>
+</table>
+<div id="qrcode" style="width:100px; height:100px; margin-top:15px;"></div>
+
+<script type="text/javascript">
+var qrcode = new QRCode(document.getElementById("qrcode"), {
+});
+
+function makeCode () {		
+	var elText = document.getElementById("text");
+	
+	if (!elText.value) {
+		alert("Input a text");
+		elText.focus();
+		return;
+	}
+	
+	qrcode.makeCode(elText.value);
+}
+
+makeCode();
+
+var elText = document.getElementById('text');
+elText.addEventListener("blur",function()
+{
+  makeCode();
+});
+
+</script>
+</body>
+</html>

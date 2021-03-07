@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script type="text/javascript" src="qrcode-withraw.js"></script>
+<style>
+#qrcode
+{
+  border: 20px solid white;
+}
+#tab2
+{
+  display:none;
+}
+</style>
+</head>
+<body>
+<textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
+<table>
+<tr>
+<td>ECC Level:</td>
+<td>
+<select id="eccLevel">
+  <option value="L">L (7%)</option>
+  <option value="M">M (7%)</option>
+  <option value="Q">Q (7%)</option>
+  <option value="H">H (7%)</option>
+</select>
+</td>
+<td>
+Scale:
+</td>
+<td>
+<input type="number" id="scale" value="2" min="1" max="32"/>
+</td>
+</tr>
+</table>
+
+<div id="tabbox">
+<button id=tab1butt>Image</button>
+<button id=tab2butt>Text</button>
+<div id=tab1>
+<canvas id="cOut" width="800" height="800" style="border:1px solid red;">
+</canvas>
+</div>
+<div id=tab2>
+<textarea id="textOut" style="width:500px;height:450px">
+</textarea>
+</div>
+
+</div>
+<script type="text/javascript">
+//var qrcode = new QRCode(document.getElementById("qrcode"), {});
+var qrcode;
+
+function initqr(correctLevel)
+{
+  var cL;
+  if( correctLevel == 'L' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.L
+    });
+  }
+  else if( correctLevel == 'M' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+  else if( correctLevel == 'Q' )
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.Q
+    });
+  }
+  else
+  {
+    qrcode = new QRCode(null, {
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }
+
+}
+
+//calls initqr with the ecc code set based on the dropdown.
+function initqr_gui()
+{
+  
+  initqr( document.getElementById('eccLevel').value );
+}
+
+function makeCode () {		
+  var elText = document.getElementById("text");
+  var qStr = "";
+  if (elText.value) {
+    qStr = elText.value;
+  }
+
+  var oStr = qrcode.makeCodeString(elText.value);
+  document.getElementById('textOut').value = oStr;
+
+  var nC = qrcode._oQRCode.getModuleCount();
+  var scale = 2;
+  if( document.getElementById('scale').value )
+  {
+    scale = document.getElementById('scale').value;
+  }
+  var offsetX = 10;
+  var offsetY = 10;
+  var dCanvas = document.getElementById("cOut");
+    var ctx = dCanvas.getContext('2d');
+    ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+    for(var r = 0; r < nC; ++r)
+    {
+      for(var c = 0; c < nC; ++c)
+      {
+        if( qrcode._oQRCode.isDark(r,c) )
+        {
+          ctx.fillStyle = "black";
+        }
+        else
+        {
+          ctx.fillStyle = "white";
+        }
+        ctx.fillRect(r*scale+offsetX, c*scale+offsetY, scale, scale);
+      }
+    }
+  }
+
+initqr_gui();
+makeCode();
+
+var elText = document.getElementById('text');
+elText.addEventListener("blur",function()
+{
+  makeCode();
+});
+
+elText.addEventListener("input",function()
+{
+  makeCode();
+});
+document.getElementById('scale').addEventListener("input",function()
+{
+  makeCode();
+});
+document.getElementById('eccLevel').addEventListener("change",function()
+{
+  initqr_gui();
+  makeCode();
+});
+document.getElementById('tab1butt').addEventListener("click",function()
+{
+  document.getElementById('tab1').style.display = "block";
+  document.getElementById('tab2').style.display = "none";
+});
+document.getElementById('tab2butt').addEventListener("click",function()
+{
+  document.getElementById('tab1').style.display = "none";
+  document.getElementById('tab2').style.display = "block";
+});
+</script>
+</body>
+</html>
