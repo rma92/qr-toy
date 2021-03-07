@@ -21,9 +21,9 @@
 <td>
 <select id="eccLevel">
   <option value="L">L (7%)</option>
-  <option value="M">M (7%)</option>
-  <option value="Q">Q (7%)</option>
-  <option value="H">H (7%)</option>
+  <option value="M">M (15%)</option>
+  <option value="Q">Q (25%)</option>
+  <option value="H">H (30%)</option>
 </select>
 </td>
 <td>
@@ -31,6 +31,12 @@ Scale:
 </td>
 <td>
 <input type="number" id="scale" value="2" min="1" max="32"/>
+</td>
+<td>
+Length:
+</td>
+<td>
+<input id="strlen" type="text" readonly="true" value="-1" />
 </td>
 </tr>
 </table>
@@ -89,13 +95,19 @@ function initqr_gui()
   initqr( document.getElementById('eccLevel').value );
 }
 
-function makeCode () {		
+function makeCode () {
   var elText = document.getElementById("text");
   var qStr = "";
   if (elText.value) {
     qStr = elText.value;
   }
 
+  document.getElementById('strlen').value = qStr.length;
+  if( qStr.length > 12680 )
+  {
+    alert("Max length:\nH: 1268\n1663, 2331, 2953");
+    return;
+  }
   var oStr = qrcode.makeCodeString(elText.value);
   document.getElementById('textOut').value = oStr;
 

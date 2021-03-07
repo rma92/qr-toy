@@ -1,0 +1,7 @@
+For a long string:
+we can split the string, and flash through many qr codes to transfer a file.
+Header format: Q<page number>/<num pages>/<some checksum total>/<some checksum piece>
+
+Specify the length of each substring.  Split the string, flash each qr code for one second.
+
+Client reads and stores all the parts.
