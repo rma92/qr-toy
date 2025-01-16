@@ -59,7 +59,7 @@ function processScanData()
   var keys = Object.keys( dScans );
   var resultContainer = document.getElementById('qr-reader-results');
   
-  keys.sort();
+  keys = keys.sort();
   resultContainer.innerHTML = "";
   for(var i = 0; i < keys.length; ++i )
   {
@@ -67,34 +67,35 @@ function processScanData()
 
     //Sample string:
     //"Q:3:10:15748754::Four score seven years ago"
-    var a = s.split("::");
+    var a = keys[i].split("::");
     if( a.length == 2 )
     {
       var aheaders = a[0].split(':');
-      if( a.length == 4 )
+      if( aheaders.length == 4 )
       {
-        var crc = a[3];
-        var currentScan = a[1];
-        var totalScansForThisCRC = a[2];
+        var crc = aheaders[3];
+        var currentScan = aheaders[1];
+        var totalScansForThisCRC = aheaders[2];
 
         knownCRCLength[crc] = totalScansForThisCRC;
-        if( knownCRCScans == null )
+        if( knownCRCScans[crc] == null )
         {
           knownCRCScans[crc] = {};
         }
-        knownCRCScans[crc][currentScan] = a[1];
+        knownCRCScans[crc][currentScan] = aheaders[1];
       }
     }
   }
 
   //check if any Crcs are fully ready.
-  knownCRCLengthKeys = Object.Keys(knownCRCLength);
-  for(var i = 0; i < knownCRCLengthKeys.Length; ++i )
+  knownCRCLengthKeys = Object.keys(knownCRCLength);
+  console.log("CRC");
+  for(var i = 0; i < knownCRCLengthKeys.length; ++i )
   {
-    var currentCrc = knownCRCLengthKeys[i]
-    if( knownCRCScans[ currentCrc ] != null && knownCRCScans.Length >= knownCRCLength[ currentCrc ] )
+    var currentCrc = knownCRCLengthKeys[i];
+    if( knownCRCScans[ currentCrc ] != null && Object.keys(knownCRCScans[currentCrc]).length >= knownCRCLength[ currentCrc ] )
     {
-      document.getElementById("inputTextOut").Text = currentCrc + " is done";
+      document.getElementById("inputTextOut").value = currentCrc + " is done";
     }
   }
 }//process can data
@@ -134,5 +135,5 @@ function testShortScan()
   var s1 = "Q:0:2:3497144816::http://r";
   var s2 = "Q:1:2:3497144816::m.vg/";
   dScans[ s1 ] = 1;
-  dScans[ s1 ] = 1;
+  dScans[ s2 ] = 1;
 }
