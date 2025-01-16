@@ -1,7 +1,42 @@
 //var qrcode = new QRCode(document.getElementById("qrcode"), {});
 var qrcode;
+
 //if enabled, debug to console.
-const bQrSplitterDebug = true;
+var bQrSplitterDebug = false;
+
+// Timer to generate the next QR code
+var qrGenInterval = null;
+
+/*
+ * Start the qr code refresh timer.  Replaces any previous interval if needed.
+ */
+function startTimer(delay)
+{
+  if( bQrSplitterDebug ) console.log(" startTimer (delay) (" + delay + ")" );
+  clearInterval( qrGenInterval );
+  qrGenInterval = setInterval( makeNextCode, delay );
+}
+
+// Chunking functionality
+var pageid = -1;
+var numpages = 0;
+var chunks = [];
+
+/*
+ * Given a string str, returns an array containing str split into multiple strings of length size (or less).
+ */
+function stringChop (str, size)
+{
+  if( bQrSplitterDebug ) console.log(" stringChop (str, size) (" + str + ", " + size + ")" );
+  
+  if (str == null)
+  {
+    return [];
+  }
+  str = String(str);
+  return size > 0 ? str.match(new RegExp('.{1,' + size + '}', 'g')) : [str];
+}
+ 
 
 /*
  * Initializes the QR Code library with the error level set to 'L', 'M', 'Q', or 'H' (character).
@@ -46,25 +81,14 @@ function initqr_gui()
   initqr( document.getElementById('eccLevel').value );
 }
 
-var pageid = -1;
-var numpages = 0;
-var chunks = [];
-
 /*
- * Given a string str, returns an array containing str split into multiple strings of length size (or less).
+ * If the split_size is 0, makes a Qr Code
+ * 
+ * If the split_size is nonzero:
+ * - splits the string into chunks of length split_size and stores in chunks (global variable)
+ * - generates the first QR code
+ * - starts the timer to run makeNextCode to make subsequent codes.
  */
-function stringChop (str, size)
-{
-  if( bQrSplitterDebug ) console.log(" stringChop (str, size) (" + str + ", " + size + ")" );
-  
-  if (str == null)
-  {
-    return [];
-  }
-  str = String(str);
-  return size > 0 ? str.match(new RegExp('.{1,' + size + '}', 'g')) : [str];
-}
-
 function makeCode()
 {
   if( bQrSplitterDebug ) console.log( "makeCode" );
@@ -80,19 +104,27 @@ function makeCode()
   }
   else
   {
+    //split the string into chunks and store in chunks.
     if( chunks.length == 0 )
     {
       chunks = stringChop( document.getElementById("text").value, document.getElementById('split_size').value);
     }
-    ++pageid;
-    if( pageid >= chunks.length ) pageid = 0;
-
-    qStr = "Q:" + pageid + ":" + chunks.length + "\n" + chunks[pageid];
-    console.log(qStr);
-    makeCodeInt( qStr );
-    //    setTimeout( makeCode, document.getElementById('split_time').value );
+    makeNextCode();
+    startTimer( document.getElementById('split_time').value );
   }
-}
+} //makeCode()
+
+function makeNextCode()
+{
+  if( bQrSplitterDebug ) console.log( "makeNextCode()  pageid: " + pageid );
+  ++pageid;
+  if( pageid >= chunks.length ) pageid = 0;
+
+  qStr = "Q:" + pageid + ":" + chunks.length + "\n" + chunks[pageid];
+  if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
+  makeCodeInt( qStr );
+  document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;
+} //makeNextCode()
 
 function makeCodeInt (qStr)
 {
@@ -132,38 +164,36 @@ function makeCodeInt (qStr)
       ctx.fillRect(r*scale+offsetX, c*scale+offsetY, scale, scale);
     }
   }
-}//makecode
+}//makeCodeInt(qStr)
 
-initqr_gui();
-makeCode();
+//Calls makecode in response to a UI change.
+function ui_makeCode()
+{
+  initqr_gui();
+  chunks = [];
+  makeCode();
+}
 
-var elText = document.getElementById('text');
-elText.addEventListener("blur",function()
-  {
-    makeCode();
-  });
+ui_makeCode();
 
-elText.addEventListener("input",function()
-  {
-    makeCode();
-  });
-document.getElementById('scale').addEventListener("input",function()
-  {
-    makeCode();
-  });
-document.getElementById('eccLevel').addEventListener("change",function()
-  {
-    initqr_gui();
-    makeCode();
-    chunks = [];
-  });
-document.getElementById('tab1butt').addEventListener("click",function()
+document.getElementById('text').addEventListener("blur", ui_makeCode);
+document.getElementById('text').addEventListener("input", ui_makeCode);
+document.getElementById('scale').addEventListener("input", ui_makeCode);
+document.getElementById('eccLevel').addEventListener("change", ui_makeCode);
+document.getElementById('split_size').addEventListener("input", ui_makeCode);
+document.getElementById('split_time').addEventListener("input", ui_makeCode);
+document.getElementById('buttomImageMode').addEventListener("click",function()
   {
     document.getElementById('tab1').style.display = "block";
     document.getElementById('tab2').style.display = "none";
   });
-document.getElementById('tab2butt').addEventListener("click",function()
+document.getElementById('buttonTextMode').addEventListener("click",function()
   {
     document.getElementById('tab1').style.display = "none";
     document.getElementById('tab2').style.display = "block";
+  });
+document.getElementById('buttonToggleDebug').addEventListener("click",function()
+  {
+    bQrSplitterDebug = !bQrSplitterDebug;
+        console.log("Debug now set to: " + bQrSplitterDebug );
   });
