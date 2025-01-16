@@ -1,7 +1,16 @@
 <html>
   <head>
     <title>Html-Qrcode Demo</title>
+<style>
+#qr-reader-results
+{
+  font-size: 12px;
+}
+</style>
     <body>
+      <div id="toolbar">
+        <button id="buttonClearHistory">Clear History</button>
+      </div>
       <div id="qr-reader" style="width:500px"></div>
       <div id="qr-reader-results"></div>
     </body>

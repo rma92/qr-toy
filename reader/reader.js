@@ -1,3 +1,6 @@
+//dictionary to hold scans
+var dScans = {};
+
 function docReady(fn)
 {
   // see if DOM is already available
@@ -23,13 +26,27 @@ docReady(function ()
     {
       ++countResults;
       lastResult = decodedText;
+      dScans[ decodedText ] = '1';
       // Handle on success condition with the decoded message.
-      console.log(`Scan result ${decodedText}`, decodedResult);
-      resultContainer.innerHTML = resultContainer.innerHTML + "<br/>\r\n" + decodedText;
+      //console.log(`Scan result ${decodedText}`, decodedResult);
+      //resultContainer.innerHTML = resultContainer.innerHTML + "<br/>\r\n" + decodedText;
+      var keys = Object.keys( dScans );
+      keys.sort();
+      resultContainer.innerHTML = "";
+      for(var i = 0; i < keys.length; ++i )
+      {
+        resultContainer.innerHTML += keys[i] + "<br/>";
+      }
     }
   }
 
   var html5QrcodeScanner = new Html5QrcodeScanner(
-    "qr-reader", { fps: 10, qrbox: 250 });
+    "qr-reader", { fps: 20, qrbox: 250 });
   html5QrcodeScanner.render(onScanSuccess);
 });
+
+document.getElementById("buttonClearHistory").addEventListener("click",function()
+  {
+    var dScans = {};
+    document.getElementById('qr-reader-results').innerHTML = "";
+  });
