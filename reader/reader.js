@@ -202,7 +202,7 @@ function update_file_download_links()
       d.innerHTML += "<li><a download=\""
                   + knownCRCFilename[ keysFf[i] ]
                   + "\" href=\""
-                  + "data:text/plain;base64," + _arrayBufferToBase64( b10decode_totext( outString ) )
+                  + "data:text/plain;base64," + _arrayBufferToBase64( b10decode( outString ) )
                   + "\">"
                   + knownCRCFilename[ keysFf[i] ]
                   + "</a></li>\n";
