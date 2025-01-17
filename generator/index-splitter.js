@@ -271,6 +271,7 @@ function ui_loadFileToInput()
       }
       console.log( encoded );
       document.getElementById('text').value = encoded;
+      ui_makeCode();
     }
     reader.readAsArrayBuffer(file);
   }
