@@ -153,7 +153,7 @@ function processScanData()
 
         if( aheaders.length >= 6 )
         {
-          knownCRCEncoding = aheaders[5];
+          knownCRCEncoding[crc] = aheaders[5];
         }
       }
     }
