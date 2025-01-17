@@ -295,15 +295,23 @@ function ui_loadFileToInput()
 function makeStaticPage()
 {
   const popupWindow = window.open("", "popupWindow", "width=600,height=400");
+  popupWindow.document.innerHTML = "";
   pageid = 0;
   // Write the random text to the new window
+  var iFontsize = document.getElementById('staticPageFontSize').value;
+  var iTablecolumns = document.getElementById('staticPageTableColumns').value;
   popupWindow.document.write(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Random Text</title>
+          <style>
+          body{
+          font-size: ` + iFontsize + `px;
+          }
+        </style>
+       <title>Random Text</title>
       </head>
       <body>`);
   ui_makeCode();
@@ -328,11 +336,19 @@ function makeStaticPage()
     popupWindow.document.write("<table><tr>");
     for( var i = 0; i < chunks.length; ++i )
     {
+      if( i % iTablecolumns == 0 && i != 0 )
+      {
+        console.log("newline");
+        popupWindow.document.write("</tr><tr>\n");
+      }
+
       pageid = i;
       makeCodeByChunkId(i);
     
       if( bLabel ) popupWindow.document.write("<td>" + i + "</td>");
       popupWindow.document.write("<td><img src=\"" + document.getElementById("cOut").toDataURL() + "\" /></td>");
+      //console.log( "i, iTablecolumns, i % iTablecolumns" + i + " : " + iTablecolumns + ":" + (i % iTablecolumns ) );
+      
     }
     popupWindow.document.write("</tr></table>");
   }
