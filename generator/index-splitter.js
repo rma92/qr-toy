@@ -277,6 +277,34 @@ function ui_loadFileToInput()
   }
 }
 
+function makeStaticPage()
+{
+  const popupWindow = window.open("", "popupWindow", "width=600,height=400");
+
+  // Write the random text to the new window
+  popupWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Random Text</title>
+      </head>
+      <body>`);
+  ui_makeCode();
+  clearInterval( qrGenInterval );
+  for( var i = 0; i < chunks.length; ++i )
+  {
+    makeNextCode();
+    popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" /><br/>");
+  }
+
+  popupWindow.document.write(`
+    </body>
+    </html>
+  `);
+}
+
 ui_makeCode();
 
 document.getElementById('text').addEventListener("blur", ui_makeCode);
@@ -300,6 +328,7 @@ document.getElementById('buttonToggleDebug').addEventListener("click",function()
     bQrSplitterDebug = !bQrSplitterDebug;
         console.log("Debug now set to: " + bQrSplitterDebug );
   });
+document.getElementById('buttonToStaticPage').addEventListener("click", makeStaticPage);
 document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);
 document.querySelectorAll('input[name="encodeAs"]').forEach(radio => {
   radio.addEventListener('change', ui_loadFileToInput);
