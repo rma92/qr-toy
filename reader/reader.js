@@ -1,3 +1,6 @@
+//regex to check if is base64
+var base64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
+
 //dictionary to hold scans - key is the scan data to facilitate keeping unique ones only.
 var dScans = {};
 
@@ -6,10 +9,11 @@ var dScans = {};
  *
  * knownCRCLength value is the number of chunks for this crc (the 3rd item)
  * knownCRCScans value is an array of the scans.
+ * finishedFiles value is the concatenated values of the files once all parts have been scanned.
  */
 var knownCRCLength = {};
 var knownCRCScans = {};
-
+var finishedFiles = {};
 /*
  * Resets the stored data
  */
@@ -82,7 +86,7 @@ function processScanData()
         {
           knownCRCScans[crc] = {};
         }
-        knownCRCScans[crc][currentScan] = aheaders[1];
+        knownCRCScans[crc][currentScan] = a[1];
       }
     }
   }
@@ -93,13 +97,62 @@ function processScanData()
   for(var i = 0; i < knownCRCLengthKeys.length; ++i )
   {
     var currentCrc = knownCRCLengthKeys[i];
-    if( knownCRCScans[ currentCrc ] != null && Object.keys(knownCRCScans[currentCrc]).length >= knownCRCLength[ currentCrc ] )
+    if( knownCRCScans[ currentCrc ] == null || finishedFiles[ currentCrc ] != null )
     {
+      continue;
+    }
+    var currentCrcScanKeys = Object.keys(knownCRCScans[currentCrc])
+    if( currentCrcScanKeys.length >= knownCRCLength[ currentCrc ] )
+    {
+      var outString = "";
       document.getElementById("inputTextOut").value = currentCrc + " is done";
+      for(var j = 0; j < currentCrcScanKeys.length; ++j )
+      {
+        outString += knownCRCScans[currentCrc][ currentCrcScanKeys[j] ];
+      }
+      console.log( "data:text/plain;base64," + 
+        btoa(unescape(encodeURIComponent(outString ))) );
+      finishedFiles[ currentCrc ] = outString;
+      update_file_download_links();
     }
   }
 }//process can data
 
+/*
+ * Call from processScanData when a new file is finished to update the links.
+ */
+function update_file_download_links()
+{
+  var d = document.getElementById("file-links");
+  var keysFf = Object.keys( finishedFiles );
+  d.innerHTML = "<ul>";
+  for( var i = 0; i < keysFf.length; ++i )
+  {
+    var outString = finishedFiles[ keysFf[i]];
+    if( base64regex.test( outString ) )
+    {
+      //Is Base64
+      d.innerHTML += "<li><a download=\""
+                  + keysFf[i]
+                  + "\" href=\""
+                  + "data:text/plain;base64," + outString
+                  + "\">"
+                  + keysFf[i]
+                  + "</a></li>\n";
+    }
+    else
+    {
+      d.innerHTML += "<li><a download=\""
+                  + keysFf[i]
+                  + "\" href=\""
+                  + "data:text/plain;base64," + btoa(unescape(encodeURIComponent(outString ))) 
+                  + "\">"
+                  + keysFf[i]
+                  + "</a></li>\n";
+    }
+  }
+  d.innerHTML += "</ul>";
+}
 /*
  * When the page is ready and interactive, scanning attempts start.
  */
