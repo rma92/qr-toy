@@ -182,7 +182,19 @@ function makeCode()
 function makeCodeByChunkId( pageid )
 {
   var szFilename = document.getElementById("szFilename").value;
-  qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + "::" + chunks[pageid];
+  //fileData contains the encoding - B10 or B64 if applicable.
+  var fileData = "";
+  const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
+  if( encodingType === 'base64' )
+  {
+    fileData = ":B64";
+  }
+  else if( encodingType === 'base10' )
+  {
+    fileData = ":B10";
+  }
+
+  qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
   //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
@@ -311,7 +323,7 @@ function makeStaticPage()
           font-size: ` + iFontsize + `px;
           }
         </style>
-       <title>Random Text</title>
+       <title>Static Page</title>
       </head>
       <body>`);
   ui_makeCode();

@@ -15,6 +15,7 @@ var dScans = {};
 var knownCRCLength = {};
 var knownCRCScans = {};
 var knownCRCFilename = {};
+var knownCRCEncoding = {};
 var finishedFiles = {};
 /*
  * Resets the stored data
@@ -139,6 +140,7 @@ function processScanData()
         }
         knownCRCScans[crc][currentScan] = a[1];
 
+        //filename
         if( aheaders.length >= 5 )
         {
           //Add the filename if there is one
@@ -147,6 +149,11 @@ function processScanData()
         else
         {
           knownCRCFilename[crc] = crc + ".txt";
+        }
+
+        if( aheaders.length >= 6 )
+        {
+          knownCRCEncoding = aheaders[5];
         }
       }
     }
@@ -190,7 +197,17 @@ function update_file_download_links()
   for( var i = 0; i < keysFf.length; ++i )
   {
     var outString = finishedFiles[ keysFf[i]];
-    if( base64regex.test( outString ) )
+    if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
+    {
+      d.innerHTML += "<li><a download=\""
+                  + knownCRCFilename[ keysFf[i] ]
+                  + "\" href=\""
+                  + "data:text/plain;base64," + _arrayBufferToBase64( b10decode_totext( outString ) )
+                  + "\">"
+                  + knownCRCFilename[ keysFf[i] ]
+                  + "</a></li>\n";
+    }
+    else if( knownCRCEncoding[ keysFf[i] ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
     {
       //Is Base64
       d.innerHTML += "<li><a download=\""
