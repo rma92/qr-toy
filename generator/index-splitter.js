@@ -134,8 +134,9 @@ function makeNextCode()
   if( bQrSplitterDebug ) console.log( "makeNextCode()  pageid: " + pageid );
   ++pageid;
   if( pageid >= chunks.length ) pageid = 0;
-
-  qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
+  var szFilename = document.getElementById("szFilename").value;
+  qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + "::" + chunks[pageid];
+  //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
   document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;

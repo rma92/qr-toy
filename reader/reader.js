@@ -9,10 +9,12 @@ var dScans = {};
  *
  * knownCRCLength value is the number of chunks for this crc (the 3rd item)
  * knownCRCScans value is an array of the scans.
+ * knownCRCFilename value is the file name if it was specified, otherwise <crc>.txt.
  * finishedFiles value is the concatenated values of the files once all parts have been scanned.
  */
 var knownCRCLength = {};
 var knownCRCScans = {};
+var knownCRCFilename = {};
 var finishedFiles = {};
 /*
  * Resets the stored data
@@ -75,7 +77,7 @@ function processScanData()
     if( a.length == 2 )
     {
       var aheaders = a[0].split(':');
-      if( aheaders.length == 4 )
+      if( aheaders.length >= 4 )
       {
         var crc = aheaders[3];
         var currentScan = aheaders[1];
@@ -87,6 +89,16 @@ function processScanData()
           knownCRCScans[crc] = {};
         }
         knownCRCScans[crc][currentScan] = a[1];
+
+        if( aheaders.length >= 5 )
+        {
+          //Add the filename if there is one
+          knownCRCFilename[crc] = aheaders[4];
+        }
+        else
+        {
+          knownCRCFilename[crc] = crc + ".txt";
+        }
       }
     }
   }
@@ -133,21 +145,21 @@ function update_file_download_links()
     {
       //Is Base64
       d.innerHTML += "<li><a download=\""
-                  + keysFf[i]
+                  + knownCRCFilename[ keysFf[i] ]
                   + "\" href=\""
                   + "data:text/plain;base64," + outString
                   + "\">"
-                  + keysFf[i]
+                  + knownCRCFilename[ keysFf[i] ]
                   + "</a></li>\n";
     }
     else
     {
       d.innerHTML += "<li><a download=\""
-                  + keysFf[i]
+                  + knownCRCFilename[ keysFf[i] ]
                   + "\" href=\""
                   + "data:text/plain;base64," + btoa(unescape(encodeURIComponent(outString ))) 
                   + "\">"
-                  + keysFf[i]
+                  + knownCRCFilename[ keysFf[i] ]
                   + "</a></li>\n";
     }
   }
@@ -185,8 +197,8 @@ document.getElementById("buttonClearHistory").addEventListener("click",function(
 
 function testShortScan()
 {
-  var s1 = "Q:0:2:3497144816::http://r";
-  var s2 = "Q:1:2:3497144816::m.vg/";
+  var s1 = "Q:0:2:3497144816:out.txt::http://r";
+  var s2 = "Q:1:2:3497144816:out.txt::m.vg/";
   dScans[ s1 ] = 1;
   dScans[ s2 ] = 1;
 }
