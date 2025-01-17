@@ -40,6 +40,33 @@ function b_crc32 (str) {
 };
 
 /*
+ * Base 10 encode/decode - encodes or decodes bytes or strings into a Base 10 string.
+ * 
+ * It's more efficient to store Base10 than Base64 or binary in a QR Code.
+ *
+ * See: https://huonw.github.io/blog/2024/03/qr-base10-base64/
+ */
+const B10CONV_DIGITS_PER_BYTE = Math.log10(Math.pow(2, 8));
+
+function b10encode(data) {
+    let encoder = new TextEncoder();
+    let byteArray = encoder.encode(data);
+    let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
+    let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
+    let prefix = '0'.repeat(encodedLength - raw.length);
+    return prefix + raw;
+}
+
+function b10decode(s) {
+    let decodedLength = Math.floor(s.length / B10CONV_DIGITS_PER_BYTE);
+    let num = BigInt(s);
+    let hex = num.toString(16).padStart(decodedLength * 2, '0');
+    let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+    let decoder = new TextDecoder();
+    return decoder.decode(byteArray);
+}
+
+/*
  * Waits until the doc is ready/interactive.
  */
 function docReady(fn)

@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+  </head>
+  <body>
+    <h1>QR Code File Copy</h1>
+    <ul>
+      <li><a href=generator/index-splitter.html>Generator</a></li>
+      <li><a href=reader/reader.html>Reader</a></li>
+    </ul>
+
+    <p>The QR Code File Copy generates a stream of QR codes containing segments of a file or other data.  The reader has an HTML5 scanner that uses a camera to continuously scan and store data.  Once all the pieces of a file are scanned, the segments are combined and the file can be saved.</p>
+
+    <h2>Header format</h2>
+    <p>The header in each QR code contains a series of fields separated by colons (:), followed by a double colon (::).  The fields are as follows:</p>
+    <ul>
+      <li><b>Q</b> - just an identifying header.</li>
+      <li><b>Current Chunk ID (integer)</b> - the current chunk.  They should be 0 indexed.</li>
+      <li><b>Total Chunks (integer)</b> - the total number of chunks for this file.</li>
+      <li><b>CRC32 (integer)</b> - the CRC32 for the entire file.</li>
+      <li><b>Filename (string, optional)</b> - a file name to save the file as once it's done transferring.</li>
+      <li><b>encode (string, optional)</b> - B64, or B10 for base64 encoding or base10 encoding
+    </ul>
+
+    <h2>References</h2>
+    <ul>
+      <li><a href=https://huonw.github.io/blog/2024/03/qr-base10-base64/>10 > 64, in QR codes</a> By Huon Wilson — 31 Mar 2024 (accessed 17 Jan 2025</li>
+    </ul>
+  </body>
+</html>
