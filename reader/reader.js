@@ -48,22 +48,44 @@ function b_crc32 (str) {
  */
 const B10CONV_DIGITS_PER_BYTE = Math.log10(Math.pow(2, 8));
 
-function b10encode(data) {
-    let encoder = new TextEncoder();
-    let byteArray = encoder.encode(data);
-    let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
-    let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
-    let prefix = '0'.repeat(encodedLength - raw.length);
-    return prefix + raw;
+function b10encode( arrayBuffer ) {
+  let byteArray = new Uint8Array(arrayBuffer);
+  let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
+  let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
+  let prefix = '0'.repeat(encodedLength - raw.length);
+  return prefix + raw;
 }
 
-function b10decode(s) {
-    let decodedLength = Math.floor(s.length / B10CONV_DIGITS_PER_BYTE);
-    let num = BigInt(s);
-    let hex = num.toString(16).padStart(decodedLength * 2, '0');
-    let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-    let decoder = new TextDecoder();
-    return decoder.decode(byteArray);
+function b10decode(s)
+{
+  let decodedLength = Math.floor(s.length / B10CONV_DIGITS_PER_BYTE);
+  let num = BigInt(s);
+  let hex = num.toString(16).padStart(decodedLength * 2, '0');
+  let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  return byteArray;
+}
+
+function b10decode_totext(s)
+{
+  var decoder = new TextDecoder();  
+  return decoder.decode( b10decode(s) );
+}
+
+function base64encode(data) {
+    let encoder = new TextEncoder();
+    let byteArray = encoder.encode(data);
+    let binaryString = String.fromCharCode(...byteArray);
+    return btoa(binaryString);
+}
+
+function _arrayBufferToBase64( buffer ) {
+    var binary = '';
+    var bytes = new Uint8Array( buffer );
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode( bytes[ i ] );
+    }
+    return window.btoa( binary );
 }
 
 /*

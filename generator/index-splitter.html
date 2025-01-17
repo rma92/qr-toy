@@ -36,25 +36,39 @@
           Length:
         </td>
         <td>
-          <input id="strlen" type="text" readonly="true" value="-1" />
+          <input id="strlen" type="text" readonly="true" value="-1" size=6 />
         </td>
         <td>
           Split Size:
         </td>
         <td>
-          <input id="split_size" type="number" value="0" min=0 />
+          <input id="split_size" type="number" value="0" min=0 max=8000 />
         </td>
         <td>
           Split Time:
         </td>
         <td>
-          <input id="split_time" type="number" value="1000" /> ms
+          <input id="split_time" type="number" value="1000" min=1 max=10000 /> ms
         </td>
         <td>
           Filename:
         </td>
         <td>
           <input id="szFilename" value="out.txt" />
+        </td>
+        <td>
+          Load file:
+        </td>
+        <td>
+          <input type="file" id="fileInput">          
+        </td>
+        <td>
+          Encode as:
+        </td>
+        <td>
+          <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64<br/>
+          <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
+          <input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"/>Raw
         </td>
       </tr>
     </table>

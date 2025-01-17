@@ -53,27 +53,54 @@ function b_crc32 (str) {
     }
     return (crc ^ (-1)) >>> 0;
 };
+
 /*
- * Base 10 encode/decode
+ * Base 10 encode/decode - encodes or decodes bytes or strings into a Base 10 string.
+ * 
+ * It's more efficient to store Base10 than Base64 or binary in a QR Code.
+ *
+ * See: https://huonw.github.io/blog/2024/03/qr-base10-base64/
  */
 const B10CONV_DIGITS_PER_BYTE = Math.log10(Math.pow(2, 8));
 
-function b10encode(data) {
-    let encoder = new TextEncoder();
-    let byteArray = encoder.encode(data);
-    let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
-    let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
-    let prefix = '0'.repeat(encodedLength - raw.length);
-    return prefix + raw;
+function b10encode( arrayBuffer ) {
+  let byteArray = new Uint8Array(arrayBuffer);
+  let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
+  let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
+  let prefix = '0'.repeat(encodedLength - raw.length);
+  return prefix + raw;
 }
 
-function b10decode(s) {
-    let decodedLength = Math.floor(s.length / B10CONV_DIGITS_PER_BYTE);
-    let num = BigInt(s);
-    let hex = num.toString(16).padStart(decodedLength * 2, '0');
-    let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-    let decoder = new TextDecoder();
-    return decoder.decode(byteArray);
+function b10decode(s)
+{
+  let decodedLength = Math.floor(s.length / B10CONV_DIGITS_PER_BYTE);
+  let num = BigInt(s);
+  let hex = num.toString(16).padStart(decodedLength * 2, '0');
+  let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  return byteArray;
+}
+
+function b10decode_totext(s)
+{
+  var decoder = new TextDecoder();  
+  return decoder.decode( b10decode(s) );
+}
+
+function base64encode(data) {
+    let encoder = new TextEncoder();
+    let byteArray = encoder.encode(data);
+    let binaryString = String.fromCharCode(...byteArray);
+    return btoa(binaryString);
+}
+
+function _arrayBufferToBase64( buffer ) {
+    var binary = '';
+    var bytes = new Uint8Array( buffer );
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode( bytes[ i ] );
+    }
+    return window.btoa( binary );
 }
 
 /*
@@ -214,6 +241,41 @@ function ui_makeCode()
   makeCode();
 }
 
+/*
+ * Load the file selected in the file picker to the input box.
+ */
+function ui_loadFileToInput()
+{
+  const fileInput = document.getElementById('fileInput');
+  const file = fileInput.files[0];
+  if (file)
+  {
+    const reader = new FileReader();
+    document.getElementById('szFilename').value = file.name;
+    reader.onload = function(e)
+    {
+      let encoded;
+      console.log(reader.result);
+      const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
+      if (encodingType === 'base64')
+      {
+        encoded = _arrayBufferToBase64( reader.result );
+      }
+      else if (encodingType === 'base10')
+      {
+        encoded = b10encode( reader.result );
+      }
+      else
+      {
+        encoded = new TextDecoder("utf-8").decode( reader.result );
+      }
+      console.log( encoded );
+      document.getElementById('text').value = encoded;
+    }
+    reader.readAsArrayBuffer(file);
+  }
+}
+
 ui_makeCode();
 
 document.getElementById('text').addEventListener("blur", ui_makeCode);
@@ -237,3 +299,10 @@ document.getElementById('buttonToggleDebug').addEventListener("click",function()
     bQrSplitterDebug = !bQrSplitterDebug;
         console.log("Debug now set to: " + bQrSplitterDebug );
   });
+document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);
+document.querySelectorAll('input[name="encodeAs"]').forEach(radio => {
+  radio.addEventListener('change', ui_loadFileToInput);
+});
+//atob( document.getElementById("text").value );
+// b10decode( document.getElementById("text").value );
+
