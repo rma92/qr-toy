@@ -234,7 +234,7 @@ docReady(function ()
   }
 
   var html5QrcodeScanner = new Html5QrcodeScanner(
-    "qr-reader", { fps: 20, qrbox: 250 });
+    "qr-reader", { fps: 20, qrbox: 500 });
   html5QrcodeScanner.render(onScanSuccess);
 });
 

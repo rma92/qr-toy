@@ -179,16 +179,21 @@ function makeCode()
   }
 } //makeCode()
 
-function makeNextCode()
+function makeCodeByChunkId( pageid )
 {
-  if( bQrSplitterDebug ) console.log( "makeNextCode()  pageid: " + pageid );
-  ++pageid;
-  if( pageid >= chunks.length ) pageid = 0;
   var szFilename = document.getElementById("szFilename").value;
   qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + "::" + chunks[pageid];
   //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
+}
+
+function makeNextCode()
+{
+  if( bQrSplitterDebug ) console.log( "makeNextCode()  pageid: " + pageid );
+  ++pageid;
+  if( pageid >= chunks.length ) pageid = 0;
+  makeCodeByChunkId( pageid );
   document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;
 } //makeNextCode()
 
@@ -196,24 +201,34 @@ function makeCodeInt (qStr)
 {
   if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
   document.getElementById('strlen').value = qStr.length;
+
   if( qStr.length > 12680 )
   {
     clearInterval( qrGenInterval );
-    alert("Max length:\nH: 1268\n1663, 2331, 2953");
+    document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
     return;
   }
   var oStr = qrcode.makeCodeString(qStr);
   document.getElementById('textOut').value = oStr;
 
+  //get the size of the canvas;
+
+  
   var nC = qrcode._oQRCode.getModuleCount();
   var scale = 2;
   if( document.getElementById('scale').value )
   {
     scale = document.getElementById('scale').value;
   }
+
+  var qrCodeSize = Math.ceil(Math.sqrt( oStr.length )) * scale;
+
   var offsetX = 10;
   var offsetY = 10;
+
   var dCanvas = document.getElementById("cOut");
+  dCanvas.width = qrCodeSize + offsetX * 2;
+  dCanvas.height = qrCodeSize + offsetY * 2;
   var ctx = dCanvas.getContext('2d');
   ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
   for(var r = 0; r < nC; ++r)
@@ -280,7 +295,7 @@ function ui_loadFileToInput()
 function makeStaticPage()
 {
   const popupWindow = window.open("", "popupWindow", "width=600,height=400");
-
+  pageid = 0;
   // Write the random text to the new window
   popupWindow.document.write(`
       <!DOCTYPE html>
@@ -293,10 +308,44 @@ function makeStaticPage()
       <body>`);
   ui_makeCode();
   clearInterval( qrGenInterval );
+
+  const pageType = document.querySelector('input[name="staticPageAs"]:checked').value;
+  const bLabel = document.getElementById('staticPageLabel').checked;
+
+  if( pageType === 'lines' )
+  {
+    for( var i = 0; i < chunks.length; ++i )
+    {
+      pageid = i;
+      makeCodeByChunkId(i);
+    
+      if( bLabel ) popupWindow.document.write("" + i + ": ");
+      popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" /><br/>");
+    }
+  }
+  else if( pageType === 'table' )
+  {
+    popupWindow.document.write("<table><tr>");
+    for( var i = 0; i < chunks.length; ++i )
+    {
+      pageid = i;
+      makeCodeByChunkId(i);
+    
+      if( bLabel ) popupWindow.document.write("<td>" + i + "</td>");
+      popupWindow.document.write("<td><img src=\"" + document.getElementById("cOut").toDataURL() + "\" /></td>");
+    }
+    popupWindow.document.write("</tr></table>");
+  }
+  else //raw
+  {
   for( var i = 0; i < chunks.length; ++i )
   {
-    makeNextCode();
-    popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" /><br/>");
+    pageid = i;
+    makeCodeByChunkId(i);
+    
+    if( bLabel ) popupWindow.document.write("" + i + ": ");
+    popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" />");
+  }
   }
 
   popupWindow.document.write(`

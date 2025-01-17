@@ -17,6 +17,7 @@
     <textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
     <table>
       <tr>
+        <th>QR Settings:</th>
         <td>ECC Level:</td>
         <td>
           <select id="eccLevel">
@@ -56,6 +57,13 @@
         <td>
           <input id="szFilename" value="out.txt" />
         </td>
+      </tr>
+    </table>
+    <table>
+      <tr>
+        <th>
+          File:
+        </th>
         <td>
           Load file:
         </td>
@@ -72,12 +80,29 @@
         </td>
       </tr>
     </table>
+    <table>
+      <tr>
+        <th>
+          Static Page:
+        </th>
+        <td>
+          <button id=buttonToStaticPage>Make Static Page</button>
+        </td>
+        <td>
+          <input type="radio" name="staticPageAs" id="staticPageAsRaw" value="raw"/>Raw<br/>
+          <input type="radio" name="staticPageAs" id="staticPageAsLines" value="lines" checked/>One Per Line<br/>
+          <input type="radio" name="staticPageAs" id="staticPageAsTable" value="table"/>Table
+        </td>
+        <td>
+          <input type="checkbox" name="staticPageLabel" id="staticPageLabel" />Label codes
+        </td>
+      </tr>
+    </table>
 
     <div id="tabbox">
       <button id=buttomImageMode>Image</button>
       <button id=buttonTextMode>Text</button>
       <button id=buttonToggleDebug>Debug</button>
-      <button id=buttonToStaticPage>StaticPage</button>
       <input id="pageDataOut" /> 
       <div id=tab1>
         <canvas id="cOut" width="1200" height="1200" style="border:1px solid red;">
