@@ -3,3 +3,6 @@ https://github.com/ricmoo/QRCode
 
 Compile in TCC:
 tcc main.c qrcode.c
+
+Compile in OpenWatcom:
+cl main.c qrcode.c
