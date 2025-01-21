@@ -186,6 +186,42 @@ function processScanData()
   }
 }//process can data
 
+/**
+ * Checks if a filename ends with a valid image extension.
+ * @param {string} filename - The name of the file to check.
+ * @returns {boolean} - Returns true if the filename ends with a valid image extension, false otherwise.
+ */
+function hasImageExtensionRegex(filename) {
+    const regex = /\.(png|jpe?g|gif|webp)$/i;
+    return regex.test(filename);
+}
+
+/**
+ * Extracts the file extension from a filename.
+ * @param {string} filename - The name of the file.
+ * @returns {string|null} - The file extension in lowercase without the dot, or null if none found.
+ */
+function getFileExtension(filename) {
+    const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+    return match ? match[1] : null;
+}
+
+/**
+ * Returns the MIME type based on the file extension.
+ * @param {string} extension - The file extension (without the dot).
+ * @returns {string|null} - The corresponding MIME type or null if unsupported.
+ */
+function getMimeType(extension) {
+    const mimeTypes = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp"
+    };
+    return mimeTypes[extension] || null;
+}
+
 /*
  * Call from processScanData when a new file is finished to update the links.
  */
@@ -197,36 +233,35 @@ function update_file_download_links()
   for( var i = 0; i < keysFf.length; ++i )
   {
     var outString = finishedFiles[ keysFf[i]];
+    var b64Result = "";
+    var filename = knownCRCFilename[ keysFf[i] ];
     if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
     {
-      d.innerHTML += "<li><a download=\""
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "\" href=\""
-                  + "data:text/plain;base64," + _arrayBufferToBase64( b10decode( outString ) )
-                  + "\">"
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "</a></li>\n";
+      b64Result = _arrayBufferToBase64( b10decode( outString ) );
     }
     else if( knownCRCEncoding[ keysFf[i] ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
     {
+      b64Result = outString;
       //Is Base64
-      d.innerHTML += "<li><a download=\""
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "\" href=\""
-                  + "data:text/plain;base64," + outString
-                  + "\">"
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "</a></li>\n";
     }
     else
     {
-      d.innerHTML += "<li><a download=\""
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "\" href=\""
-                  + "data:text/plain;base64," + btoa(unescape(encodeURIComponent(outString ))) 
-                  + "\">"
-                  + knownCRCFilename[ keysFf[i] ]
-                  + "</a></li>\n";
+      b64Result = btoa(unescape(encodeURIComponent(outString ))) ;
+    }
+    d.innerHTML += "<li><a download=\""
+                + filename
+                + "\" href=\""
+                + "data:text/plain;base64," + b64Result
+                + "\">"
+                + filename
+                + "</a></li>\n";
+    console.log( filename );
+    if( hasImageExtensionRegex( filename ) )
+    {
+      const base64Data = b64Result;
+      const extension = getFileExtension( filename );
+      const mimeType = getMimeType(extension);
+      d.innerHTML += `<br/><img src="data:${mimeType};base64,${base64Data}" alt="${filename}" />`;
     }
   }
   d.innerHTML += "</ul>";

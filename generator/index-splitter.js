@@ -211,47 +211,8 @@ function makeCodeIntSegments (qStr, ecc)
       segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
     }
   }
-  /*
-  var strsflat = [];
-  var segs = [];
-  for(var i = 0; i < strs.length; ++i )
-  {
-    if( strs[i].category == "Numeric-Only" )
-    {
-      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i].value) );
-    }
-    else if( strs[i].category == "Alphanumeric" )
-    {
-      console.log(strs[i].value);
-      segs.push( qrcodegen.QrSegment.makeAlphanumeric(strs[i].value) );
-    }
-    else
-    {
-      //segs.push( qrcodegen.QrSegment.makeBytes(strs[i].value) );
-      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i].value))[0] );
-    }
-  }
-  */
   console.log(strs);
-  //console.log(strsflat);
-  //var segs = qrcodegen.QrSegment.makeSegments(strsflat);
-  /*
-  var segs = [];
-  for(var i = 0; i < strs.length; ++i )
-  {
-      segs.push( qrcodegen.QrSegment.makeSegments(strs[i]) );
-  }
-  */
-  //segs.push( qrcodegen.QrSegment.makeSegments("qStr") );
   console.log(segs);
-  /*
-  var segs = [
-    qrcodegen.QrSegment.makeAlphanumeric("QSTR"),
-    qrcodegen.QrSegment.makeNumeric("123")];
-  console.log(segs);
-  qr = qrcodegen.QrCode.encodeSegments(segs, qrcodegen.QrCode.Ecc.LOW);
-*/
-  //var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
   qr = qrcodegen.QrCode.encodeSegments(segs, ecc);
   return qr;
 }
