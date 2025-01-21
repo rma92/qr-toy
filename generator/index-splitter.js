@@ -220,6 +220,7 @@ function makeCodeInt (qStr)
     document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
     return;
   }
+
   var oStr = qrcode.makeCodeString(qStr);
   document.getElementById('textOut').value = oStr;
 
