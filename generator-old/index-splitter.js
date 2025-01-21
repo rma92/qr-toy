@@ -1,5 +1,5 @@
 //var qrcode = new QRCode(document.getElementById("qrcode"), {});
-//var qrcode;
+var qrcode;
 
 //if enabled, debug to console.
 var bQrSplitterDebug = false;
@@ -111,7 +111,6 @@ function _arrayBufferToBase64( buffer ) {
 function initqr(correctLevel)
 {
   if( bQrSplitterDebug ) console.log(" initqr: " + correctLevel );
-  /*
   var cL;
   if( correctLevel == 'L' )
   {
@@ -137,7 +136,6 @@ function initqr(correctLevel)
       correctLevel: QRCode.CorrectLevel.H
     });
   }
-  */
 }//initqr
 
 /*
@@ -223,23 +221,13 @@ function makeCodeInt (qStr)
     return;
   }
 
-  var ecc = qrcodegen.QrCode.Ecc.LOW;
-  var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
-  var oStr = "";
-  for(var y = 0; y < qr.modules.length; ++y )
-  {
-    for(var x = 0; x < qr.modules[y].length; ++x )
-    {
-      oStr += (qr.modules[y][x])?"#":" ";
-    }
-    oStr += "\r\n";
-  }
+  var oStr = qrcode.makeCodeString(qStr);
   document.getElementById('textOut').value = oStr;
 
   //get the size of the canvas;
 
   
-  //var nC = qrcode._oQRCode.getModuleCount();
+  var nC = qrcode._oQRCode.getModuleCount();
   var scale = 2;
   if( document.getElementById('scale').value )
   {
@@ -256,12 +244,19 @@ function makeCodeInt (qStr)
   dCanvas.height = qrCodeSize + offsetY * 2;
   var ctx = dCanvas.getContext('2d');
   ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
-  for(var y = 0; y < qr.modules.length; ++y )
+  for(var r = 0; r < nC; ++r)
   {
-    for(var x = 0; x < qr.modules[y].length; ++x )
+    for(var c = 0; c < nC; ++c)
     {
-      ctx.fillStyle = (qr.modules[y][x])?"black":"white";
-      ctx.fillRect(x*scale+offsetX, y*scale+offsetY, scale, scale);      
+      if( qrcode._oQRCode.isDark(r,c) )
+      {
+        ctx.fillStyle = "black";
+      }
+      else
+      {
+        ctx.fillStyle = "white";
+      }
+      ctx.fillRect(r*scale+offsetX, c*scale+offsetY, scale, scale);
     }
   }
 }//makeCodeInt(qStr)

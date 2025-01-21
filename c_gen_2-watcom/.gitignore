@@ -1,2 +1,5 @@
 *.exe
 *.swp
+*.obj
+*.err
+*.com
