@@ -17,6 +17,7 @@ var knownCRCScans = {};
 var knownCRCFilename = {};
 var knownCRCEncoding = {};
 var finishedFiles = {};
+var szCachedLastScan = "";
 /*
  * Resets the stored data
  */
@@ -159,9 +160,33 @@ function processScanData()
     }
   }
 
+  //Create the table of CRCs
+  var knownCRCKeys = Object.keys( knownCRCScans );
+  var tableOut = "";
+  for(var i = 0; i < knownCRCKeys.length; ++i )
+  {
+    tableOut += "<table><tr><th colspan=10>" + knownCRCFilename[ knownCRCKeys[i] ] + "(" + knownCRCKeys[i] + ")</th></tr>";
+    for(var j = 0; j < knownCRCLength[ knownCRCKeys[i] ]; ++j )
+    {
+      if( knownCRCScans[ knownCRCKeys[i] ][ j ] != null )
+      {
+        tableOut += "<td bgcolor=lime>" + j + "</td>";
+      }
+      else
+      {
+        tableOut += "<td bgcolor=red>" + j + "</td>";
+      }
+      if( j % 10 == 9 )
+      {
+        tableOut += "</tr><tr>";
+      }
+    }
+
+    tableOut += "</tr></table>";
+  }
+  document.getElementById("scanview").innerHTML = tableOut;
   //check if any Crcs are fully ready.
   knownCRCLengthKeys = Object.keys(knownCRCLength);
-  console.log("CRC");
   for(var i = 0; i < knownCRCLengthKeys.length; ++i )
   {
     var currentCrc = knownCRCLengthKeys[i];
@@ -178,8 +203,8 @@ function processScanData()
       {
         outString += knownCRCScans[currentCrc][ currentCrcScanKeys[j] ];
       }
-      console.log( "data:text/plain;base64," + 
-        btoa(unescape(encodeURIComponent(outString ))) );
+      //console.log( "data:text/plain;base64," + 
+      //  btoa(unescape(encodeURIComponent(outString ))) );
       finishedFiles[ currentCrc ] = outString;
       update_file_download_links();
     }
@@ -255,7 +280,6 @@ function update_file_download_links()
                 + "\">"
                 + filename
                 + "</a></li>\n";
-    console.log( filename );
     if( hasImageExtensionRegex( filename ) )
     {
       const base64Data = b64Result;
@@ -269,10 +293,15 @@ function update_file_download_links()
 /*
  * When the page is ready and interactive, scanning attempts start.
  */
-docReady(function ()
+function runScanner()
 {
   var resultContainer = document.getElementById('qr-reader-results');
   var lastResult, countResults = 0;
+  var ifps = 20;
+  var iqrbox = 500;
+  ifps = parseInt(document.getElementById("ifps").value);
+  iqrbox = parseInt(document.getElementById("ibox").value);
+  
   function onScanSuccess(decodedText, decodedResult)
   {
     if (decodedText !== lastResult)
@@ -281,19 +310,27 @@ docReady(function ()
       lastResult = decodedText;
       //add the scan.
       dScans[ decodedText ] = '1';
+      szCachedLastScan = lastResult;
       processScanData();
     }
   }
 
   var html5QrcodeScanner = new Html5QrcodeScanner(
-    "qr-reader", { fps: 20, qrbox: 500 });
+    "qr-reader", { fps: ifps, qrbox: iqrbox });
   html5QrcodeScanner.render(onScanSuccess);
-});
+}
+
+//docReady(runScanner);
 
 document.getElementById("buttonClearHistory").addEventListener("click",function()
   {
     reset();
     document.getElementById('qr-reader-results').innerHTML = "";
+  });
+
+document.getElementById("buttonStart").addEventListener("click",function()
+  {
+    runScanner();
   });
 
 function testShortScan()
@@ -303,3 +340,5 @@ function testShortScan()
   dScans[ s1 ] = 1;
   dScans[ s2 ] = 1;
 }
+
+

@@ -9,10 +9,30 @@
 </style>
     <body>
       <div id="toolbar">
-        <button id="buttonClearHistory">Clear History</button>
-        <input id="inputTextOut" />
+        <table>
+        <tr>
+        <td>
+          <button id="buttonStart"><b>Start</b></button>
+        </td>
+        <td>
+          <button id="buttonClearHistory">Clear History</button>
+        </td>
+        <td>
+          <input id="inputTextOut" />
+        </td>
+        <td>
+        FPS:
+          <input type="number" id="ifps" value="20" min="1" max="60"/>
+        </td>
+        <td>
+        Box: 
+          <input type="number" id="ibox" value="350" min="1" max="500"/>
+        </td>
+        </tr>
+        </table>
       </div>
       <div id="qr-reader" style="width:500px"></div>
+      <div id="scanview" style="width:500px"></div>
       <div id="file-links"></div>
       <div id="qr-reader-results"></div>
     </body>
