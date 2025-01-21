@@ -31,7 +31,7 @@ var icrc32 = 0;
 function stringChop (str, size)
 {
   if( bQrSplitterDebug ) console.log(" stringChop (str, size) (" + str + ", " + size + ")" );
-  
+
   if (str == null)
   {
     return [];
@@ -49,11 +49,11 @@ var a_table = "00000000 77073096 EE0E612C 990951BA 076DC419 706AF48F E963A535 9E
 var b_table = a_table.split(' ').map(function(s){ return parseInt(s,16) });
 
 function b_crc32 (str) {
-    var crc = -1;
-    for(var i=0, iTop=str.length; i<iTop; i++) {
-        crc = ( crc >>> 8 ) ^ b_table[( crc ^ str.charCodeAt( i ) ) & 0xFF];
-    }
-    return (crc ^ (-1)) >>> 0;
+  var crc = -1;
+  for(var i=0, iTop=str.length; i<iTop; i++) {
+    crc = ( crc >>> 8 ) ^ b_table[( crc ^ str.charCodeAt( i ) ) & 0xFF];
+  }
+  return (crc ^ (-1)) >>> 0;
 };
 
 /*
@@ -89,20 +89,20 @@ function b10decode_totext(s)
 }
 
 function base64encode(data) {
-    let encoder = new TextEncoder();
-    let byteArray = encoder.encode(data);
-    let binaryString = String.fromCharCode(...byteArray);
-    return btoa(binaryString);
+  let encoder = new TextEncoder();
+  let byteArray = encoder.encode(data);
+  let binaryString = String.fromCharCode(...byteArray);
+  return btoa(binaryString);
 }
 
 function _arrayBufferToBase64( buffer ) {
-    var binary = '';
-    var bytes = new Uint8Array( buffer );
-    var len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode( bytes[ i ] );
-    }
-    return window.btoa( binary );
+  var binary = '';
+  var bytes = new Uint8Array( buffer );
+  var len = bytes.byteLength;
+  for (var i = 0; i < len; i++) {
+    binary += String.fromCharCode( bytes[ i ] );
+  }
+  return window.btoa( binary );
 }
 
 /*
@@ -153,7 +153,7 @@ function makeCodeByChunkId( pageid )
     fileData = ":B10";
   }
 
-  qStr = "qStrPrefix:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
+  qStr = qStrPrefix + ":" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
   //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
@@ -168,10 +168,92 @@ function makeNextCode()
   document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;
 } //makeNextCode()
 
+//helper function to split string into array.
+function splitStringByCategory(input, min_length) {
+    const result = [];
+    let current = '';
+    let isNumeric = !isNaN(input[0]);
 
-function makeCodeIntSegments (qStr)
+    for (let i = 0; i < input.length; i++) {
+        const char = input[i];
+        const charIsNumeric = !isNaN(char) && char !== ' ';
+
+        if (charIsNumeric === isNumeric) {
+            current += char;
+        } else {
+            result.push(current);
+            current = char;
+            isNumeric = charIsNumeric;
+        }
+    }
+
+    if (current) {
+        result.push(current);
+    }
+
+    return result;
+}
+
+
+function makeCodeIntSegments (qStr, ecc)
 {
-
+  var qr;
+  var strs = splitStringByCategory(qStr, 10);
+  var segs = [];  
+  for(var i = 0; i < strs.length; ++i )
+  {
+    if( /[0-9]/.test( strs[i] ) )
+    {
+      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i]) );
+    }
+    else
+    {
+      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
+    }
+  }
+  /*
+  var strsflat = [];
+  var segs = [];
+  for(var i = 0; i < strs.length; ++i )
+  {
+    if( strs[i].category == "Numeric-Only" )
+    {
+      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i].value) );
+    }
+    else if( strs[i].category == "Alphanumeric" )
+    {
+      console.log(strs[i].value);
+      segs.push( qrcodegen.QrSegment.makeAlphanumeric(strs[i].value) );
+    }
+    else
+    {
+      //segs.push( qrcodegen.QrSegment.makeBytes(strs[i].value) );
+      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i].value))[0] );
+    }
+  }
+  */
+  console.log(strs);
+  //console.log(strsflat);
+  //var segs = qrcodegen.QrSegment.makeSegments(strsflat);
+  /*
+  var segs = [];
+  for(var i = 0; i < strs.length; ++i )
+  {
+      segs.push( qrcodegen.QrSegment.makeSegments(strs[i]) );
+  }
+  */
+  //segs.push( qrcodegen.QrSegment.makeSegments("qStr") );
+  console.log(segs);
+  /*
+  var segs = [
+    qrcodegen.QrSegment.makeAlphanumeric("QSTR"),
+    qrcodegen.QrSegment.makeNumeric("123")];
+  console.log(segs);
+  qr = qrcodegen.QrCode.encodeSegments(segs, qrcodegen.QrCode.Ecc.LOW);
+*/
+  //var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
+  qr = qrcodegen.QrCode.encodeSegments(segs, ecc);
+  return qr;
 }
 
 /*
@@ -191,7 +273,7 @@ function makeCodeInt (qStr)
 
   var eccStr = document.getElementById('eccLevel').value
   var ecc = qrcodegen.QrCode.Ecc.LOW;
-    if( eccStr == 'L' )
+  if( eccStr == 'L' )
   {
     ecc = qrcodegen.QrCode.Ecc.LOW;
   }
@@ -207,7 +289,8 @@ function makeCodeInt (qStr)
   {
     ecc = qrcodegen.QrCode.Ecc.HIGH;
   }
-  var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
+  //var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
+  var qr = makeCodeIntSegments(qStr, ecc);
   var oStr = "";
   for(var y = 0; y < qr.modules.length; ++y )
   {
@@ -322,7 +405,7 @@ function makeStaticPage()
     {
       pageid = i;
       makeCodeByChunkId(i);
-    
+
       if( bLabel ) popupWindow.document.write("" + i + ": ");
       popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" /><br/>");
     }
@@ -340,24 +423,24 @@ function makeStaticPage()
 
       pageid = i;
       makeCodeByChunkId(i);
-    
+
       if( bLabel ) popupWindow.document.write("<td>" + i + "</td>");
       popupWindow.document.write("<td><img src=\"" + document.getElementById("cOut").toDataURL() + "\" /></td>");
       //console.log( "i, iTablecolumns, i % iTablecolumns" + i + " : " + iTablecolumns + ":" + (i % iTablecolumns ) );
-      
+
     }
     popupWindow.document.write("</tr></table>");
   }
   else //raw
   {
-  for( var i = 0; i < chunks.length; ++i )
-  {
-    pageid = i;
-    makeCodeByChunkId(i);
-    
-    if( bLabel ) popupWindow.document.write("" + i + ": ");
-    popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" />");
-  }
+    for( var i = 0; i < chunks.length; ++i )
+    {
+      pageid = i;
+      makeCodeByChunkId(i);
+
+      if( bLabel ) popupWindow.document.write("" + i + ": ");
+      popupWindow.document.write("<img src=\"" + document.getElementById("cOut").toDataURL() + "\" />");
+    }
   }
 
   popupWindow.document.write(`
@@ -387,7 +470,7 @@ document.getElementById('buttonTextMode').addEventListener("click",function()
 document.getElementById('buttonToggleDebug').addEventListener("click",function()
   {
     bQrSplitterDebug = !bQrSplitterDebug;
-        console.log("Debug now set to: " + bQrSplitterDebug );
+    console.log("Debug now set to: " + bQrSplitterDebug );
   });
 document.getElementById('buttonToStaticPage').addEventListener("click", makeStaticPage);
 document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);
