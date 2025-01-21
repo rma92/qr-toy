@@ -7,6 +7,8 @@ var bQrSplitterDebug = false;
 // Timer to generate the next QR code
 var qrGenInterval = null;
 
+//prefix to beginning of string
+var qStrPrefix = "Q";
 /*
  * Start the qr code refresh timer.  Replaces any previous interval if needed.
  */
@@ -104,51 +106,6 @@ function _arrayBufferToBase64( buffer ) {
 }
 
 /*
- * Initializes the QR Code library with the error level set to 'L', 'M', 'Q', or 'H' (character).
- *
- * This must be called before trying to create a code.
- */
-function initqr(correctLevel)
-{
-  if( bQrSplitterDebug ) console.log(" initqr: " + correctLevel );
-  /*
-  var cL;
-  if( correctLevel == 'L' )
-  {
-    qrcode = new QRCode(null, {
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  }
-  else if( correctLevel == 'M' )
-  {
-    qrcode = new QRCode(null, {
-      correctLevel: QRCode.CorrectLevel.M
-    });
-  }
-  else if( correctLevel == 'Q' )
-  {
-    qrcode = new QRCode(null, {
-      correctLevel: QRCode.CorrectLevel.Q
-    });
-  }
-  else
-  {
-    qrcode = new QRCode(null, {
-      correctLevel: QRCode.CorrectLevel.H
-    });
-  }
-  */
-}//initqr
-
-/*
- * calls initqr with the ecc code set based on the dropdown.
- */
-function initqr_gui()
-{
-  initqr( document.getElementById('eccLevel').value );
-}
-
-/*
  * If the split_size is 0, makes a Qr Code
  * 
  * If the split_size is nonzero:
@@ -196,7 +153,7 @@ function makeCodeByChunkId( pageid )
     fileData = ":B10";
   }
 
-  qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
+  qStr = "qStrPrefix:" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
   //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
@@ -211,6 +168,15 @@ function makeNextCode()
   document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;
 } //makeNextCode()
 
+
+function makeCodeIntSegments (qStr)
+{
+
+}
+
+/*
+ * Generates the Qr Code and puts it as text and the image.
+ */
 function makeCodeInt (qStr)
 {
   if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
@@ -223,7 +189,24 @@ function makeCodeInt (qStr)
     return;
   }
 
+  var eccStr = document.getElementById('eccLevel').value
   var ecc = qrcodegen.QrCode.Ecc.LOW;
+    if( eccStr == 'L' )
+  {
+    ecc = qrcodegen.QrCode.Ecc.LOW;
+  }
+  else if( eccStr == 'M' )
+  {
+    ecc = qrcodegen.QrCode.Ecc.MEDIUM;
+  }
+  else if( eccStr == 'Q' )
+  {
+    ecc = qrcodegen.QrCode.Ecc.QUARTILE;
+  }
+  else
+  {
+    ecc = qrcodegen.QrCode.Ecc.HIGH;
+  }
   var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
   var oStr = "";
   for(var y = 0; y < qr.modules.length; ++y )
@@ -236,10 +219,6 @@ function makeCodeInt (qStr)
   }
   document.getElementById('textOut').value = oStr;
 
-  //get the size of the canvas;
-
-  
-  //var nC = qrcode._oQRCode.getModuleCount();
   var scale = 2;
   if( document.getElementById('scale').value )
   {
@@ -269,7 +248,6 @@ function makeCodeInt (qStr)
 //Calls makecode in response to a UI change.
 function ui_makeCode()
 {
-  initqr_gui();
   chunks = [];
   makeCode();
 }
