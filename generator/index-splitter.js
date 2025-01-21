@@ -211,8 +211,6 @@ function makeCodeIntSegments (qStr, ecc)
       segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
     }
   }
-  console.log(strs);
-  console.log(segs);
   qr = qrcodegen.QrCode.encodeSegments(segs, ecc);
   return qr;
 }
@@ -310,7 +308,7 @@ function ui_loadFileToInput()
     reader.onload = function(e)
     {
       let encoded;
-      console.log(reader.result);
+      //console.log(reader.result);
       const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
       if (encodingType === 'base64')
       {
@@ -324,7 +322,7 @@ function ui_loadFileToInput()
       {
         encoded = new TextDecoder("utf-8").decode( reader.result );
       }
-      console.log( encoded );
+      //console.log( encoded );
       document.getElementById('text').value = encoded;
       ui_makeCode();
     }
@@ -378,7 +376,7 @@ function makeStaticPage()
     {
       if( i % iTablecolumns == 0 && i != 0 )
       {
-        console.log("newline");
+        //console.log("newline");
         popupWindow.document.write("</tr><tr>\n");
       }
 
