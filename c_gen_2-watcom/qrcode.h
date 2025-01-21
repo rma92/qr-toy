@@ -67,12 +67,12 @@ static const bool true = 1;
 
 
 typedef struct QRCode {
-    unsigned char version;
-    unsigned char size;
-    unsigned char ecc;
-    unsigned char mode;
-    unsigned char mask;
-    unsigned char *modules;
+    uint8_t version;
+    uint8_t size;
+    uint8_t ecc;
+    uint8_t mode;
+    uint8_t mask;
+    uint8_t *modules;
 } QRCode;
 
 
@@ -82,12 +82,12 @@ extern "C"{
 
 
 
-int qrcode_getBufferSize(int version);
+uint16_t qrcode_getBufferSize(uint8_t version);
 
-int qrcode_initText(QRCode *qrcode, unsigned char *modules, int version, int ecc, const char *data);
-int qrcode_initBytes(QRCode *qrcode, unsigned char *modules, int version, int ecc, unsigned char *data, uint16_t length);
+int8_t qrcode_initText(QRCode *qrcode, uint8_t *modules, uint8_t version, uint8_t ecc, const char *data);
+int8_t qrcode_initBytes(QRCode *qrcode, uint8_t *modules, uint8_t version, uint8_t ecc, uint8_t *data, uint16_t length);
 
-bool qrcode_getModule(QRCode *qrcode, int x, int y);
+bool qrcode_getModule(QRCode *qrcode, uint8_t x, uint8_t y);
 
 
 
