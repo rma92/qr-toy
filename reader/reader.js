@@ -17,7 +17,10 @@ var knownCRCScans = {};
 var knownCRCFilename = {};
 var knownCRCEncoding = {};
 var finishedFiles = {};
+//caching of last scan info for viewer
 var szCachedLastScan = "";
+var iCachedLastScanID = 0;
+var szCachedLastScanCRC = "";
 /*
  * Resets the stored data
  */
@@ -108,23 +111,9 @@ function docReady(fn)
   }
 }
 
-/*
- * Analyze the scanned data.
- */
-function processScanData()
+function processSingleScan(szScan)
 {
-  var keys = Object.keys( dScans );
-  var resultContainer = document.getElementById('qr-reader-results');
-  
-  keys = keys.sort();
-  resultContainer.innerHTML = "";
-  for(var i = 0; i < keys.length; ++i )
-  {
-    resultContainer.innerHTML += keys[i] + "<br/>";
-
-    //Sample string:
-    //"Q:3:10:15748754::Four score seven years ago"
-    var a = keys[i].split("::");
+   var a = szScan.split("::");
     if( a.length == 2 )
     {
       var aheaders = a[0].split(':');
@@ -132,6 +121,8 @@ function processScanData()
       {
         var crc = aheaders[3];
         var currentScan = aheaders[1];
+        iCachedLastScanID = currentScan;
+        szCachedLastScanCRC = crc;
         var totalScansForThisCRC = aheaders[2];
 
         knownCRCLength[crc] = totalScansForThisCRC;
@@ -158,6 +149,24 @@ function processScanData()
         }
       }
     }
+}
+/*
+ * Analyze the scanned data.
+ */
+function processScanData()
+{
+  var keys = Object.keys( dScans );
+  var resultContainer = document.getElementById('qr-reader-results');
+  processSingleScan(szCachedLastScan);
+  keys = keys.sort();
+  resultContainer.innerHTML = "";
+  for(var i = 0; i < keys.length; ++i )
+  {
+    resultContainer.innerHTML += keys[i] + "<br/>";
+
+    //Sample string:
+    //"Q:3:10:15748754::Four score seven years ago"
+    //processSingleScan( keys[i] );
   }
 
   //Create the table of CRCs
@@ -170,7 +179,15 @@ function processScanData()
     {
       if( knownCRCScans[ knownCRCKeys[i] ][ j ] != null )
       {
-        tableOut += "<td bgcolor=lime>" + j + "</td>";
+        if( knownCRCKeys[i] == szCachedLastScanCRC && j == iCachedLastScanID )
+        {
+
+          tableOut += "<td bgcolor=lime><b>" + j + "</b></td>";
+        }
+        else
+        {
+          tableOut += "<td bgcolor=lime>" + j + "</td>";
+        }
       }
       else
       {
