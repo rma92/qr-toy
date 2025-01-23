@@ -78,6 +78,8 @@
           <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
           <input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"/>Raw
         </td>
+        <td>
+          <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
       </tr>
     </table>
     <table>
@@ -115,7 +117,7 @@
       <button id=buttomImageMode>Image</button>
       <button id=buttonTextMode>Text</button>
       <button id=buttonToggleDebug>Debug</button>
-      <input id="pageDataOut" /> 
+      <input id="pageDataOut" size="50"/> 
       <div id=tab1>
         <canvas id="cOut" width="1200" height="1200" style="border:1px solid red;">
         </canvas>
@@ -127,5 +129,8 @@
       <br/>
     </div>
     <script type="text/javascript" src="index-splitter.js"></script>
+    <!--<script type="text/javascript" src="lzma-min.js"></script>-->
+      <script src="lzma_worker-min.js"></script>
+    
   </body>
 </html>

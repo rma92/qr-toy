@@ -24,6 +24,11 @@ var pageid = -1;
 var numpages = 0;
 var chunks = [];
 var icrc32 = 0;
+var bLzma = 0;
+
+var cachedLastQr = null;
+var cachedFileContents = null;
+var cachedFileContentsRaw = null;
 
 /*
  * Given a string str, returns an array containing str split into multiple strings of length size (or less).
@@ -146,11 +151,11 @@ function makeCodeByChunkId( pageid )
   const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
   if( encodingType === 'base64' )
   {
-    fileData = ":B64";
+    fileData = (bLzma)?":LB6":":B64";
   }
   else if( encodingType === 'base10' )
   {
-    fileData = ":B10";
+    fileData = (bLzma)?":LB1":":B10";
   }
 
   qStr = qStrPrefix + ":" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
@@ -165,7 +170,7 @@ function makeNextCode()
   ++pageid;
   if( pageid >= chunks.length ) pageid = 0;
   makeCodeByChunkId( pageid );
-  document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length;
+  document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length + " v: " + cachedLastQr.version + " mask: " + cachedLastQr.mask + " size: " + cachedLastQr.size;
 } //makeNextCode()
 
 //helper function to split string into array.
@@ -249,7 +254,9 @@ function makeCodeInt (qStr)
     ecc = qrcodegen.QrCode.Ecc.HIGH;
   }
   //var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
+  //var qr = makeCodeIntSegments("abc", qrcodegen.QrCode.Ecc.MEDIUM);
   var qr = makeCodeIntSegments(qStr, ecc);
+  cachedLastQr = qr;
   var oStr = "";
   for(var y = 0; y < qr.modules.length; ++y )
   {
@@ -305,22 +312,52 @@ function ui_loadFileToInput()
   {
     const reader = new FileReader();
     document.getElementById('szFilename').value = file.name;
+    bLzma = document.getElementById('lzmaEnable').checked;
     reader.onload = function(e)
     {
       let encoded;
       //console.log(reader.result);
       const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
+      var fileContents = reader.result;
+      cachedFileContentsRaw = fileContents;
+      if( bLzma )
+      {
+        fileContents = LZMA.compress( new Uint8Array(fileContents), 9 );
+        console.log(fileContents);
+      }
+
+      cachedFileContents = fileContents;
       if (encodingType === 'base64')
       {
-        encoded = _arrayBufferToBase64( reader.result );
+        //if the split_size is a default, change ui settings for splitter
+        if( document.getElementById("split_size").value == 0
+        || document.getElementById("split_size").value == 1400
+        )
+        {
+          document.getElementById("split_size").value = 410;
+          document.getElementById("eccLevel").value = 'M';
+          document.getElementById("scale").value = 9;
+        }
+        encoded = _arrayBufferToBase64( fileContents );
       }
       else if (encodingType === 'base10')
       {
-        encoded = b10encode( reader.result );
+        //in base 10 M correction, module size changes around: 
+        //400, 490, 580, 680, 760, 875, 966, 1100, 1237, 1400
+        //if the split_size is a default, change ui settings for splitter
+        if( document.getElementById("split_size").value == 0
+        || document.getElementById("split_size").value == 410
+        )
+        {
+          document.getElementById("split_size").value = 1400;
+          document.getElementById("eccLevel").value = 'M';
+          document.getElementById("scale").value = 9;
+        }
+        encoded = b10encode( fileContents );
       }
       else
       {
-        encoded = new TextDecoder("utf-8").decode( reader.result );
+        encoded = new TextDecoder("utf-8").decode( fileContents );
       }
       //console.log( encoded );
       document.getElementById('text').value = encoded;
@@ -433,6 +470,7 @@ document.getElementById('buttonToggleDebug').addEventListener("click",function()
   });
 document.getElementById('buttonToStaticPage').addEventListener("click", makeStaticPage);
 document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);
+document.getElementById('lzmaEnable').addEventListener('change', ui_loadFileToInput);
 document.querySelectorAll('input[name="encodeAs"]').forEach(radio => {
   radio.addEventListener('change', ui_loadFileToInput);
 });
