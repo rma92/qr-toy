@@ -1,6 +1,13 @@
 <!DOCTYPE HTML>
 <html>
   <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HotQR Genertor">
+    <link rel="apple-touch-icon" sizes="144x144" href="htqr_gen.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json">
     <script type="text/javascript" src="qrcodegen-v1.8.0-es5.js"></script>
     <style>
 #qrcode
@@ -11,13 +18,23 @@
   {
   display:none;
 }
+#fileInput
+{
+  width: 200px;
+}
     </style>
   </head>
   <body>
+    <div id=toolbar>
+      <button id=buttomImageMode>Image</button>
+      <button id=buttonTextMode>Text</button>
+      <button id=buttonToggleDebug>Debug</button>
+      <button id=buttonToggleControls>Toolbar Toggle</button>
+    </div>
+    <div id=controlBox>
     <textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
     <table>
       <tr>
-        <th>QR Settings:</th>
         <td>ECC Level:</td>
         <td>
           <select id="eccLevel">
@@ -29,50 +46,42 @@
         </td>
         <td>
           Scale:
-        </td>
-        <td>
-          <input type="number" id="scale" value="20" min="1" max="32"/>
+          <br/>
+          <input type="number" id="scale" value="18" min="1" max="32"/>
         </td>
         <td>
           Length:
-        </td>
-        <td>
+          <br/>
           <input id="strlen" type="text" readonly="true" value="-1" size=6 />
         </td>
+      </tr>
+      <tr>
         <td>
           Split Size:
-        </td>
-        <td>
+          <br/>
           <input id="split_size" type="number" value="0" min=0 max=8000 />
         </td>
         <td>
           Split Time:
-        </td>
-        <td>
+          <br/>
           <input id="split_time" type="number" value="1000" min=1 max=10000 /> ms
         </td>
-        <td>
+        <td colspan=2>
           Filename:
-        </td>
-        <td>
+          <br/>
           <input id="szFilename" value="out.txt" />
         </td>
       </tr>
     </table>
     <table>
       <tr>
-        <th>
-          File:
-        </th>
         <td>
-          Load file:
-        </td>
-        <td>
+          File:<br/>
           <input type="file" id="fileInput">          
         </td>
-        <td>
+        <!--<td>
           Encode as:
-        </td>
+        </td>-->
         <td>
           <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64<br/>
           <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
@@ -82,11 +91,9 @@
           <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
       </tr>
     </table>
+    <hr/>
     <table>
       <tr>
-        <th>
-          Static Page:
-        </th>
         <td>
           <button id=buttonToStaticPage>Make Static Page</button>
         </td>
@@ -100,23 +107,18 @@
         </td>
         <td>
           FontSize:
-        </td>
-        <td>
+          <br/>
           <input type="number" id="staticPageFontSize" value="100" min="1" max="32"/>
         </td>
         <td>
           Table Columns:
-        </td>
-        <td>
+          <br/>
           <input type="number" id="staticPageTableColumns" value="3" min="1" max="10000"/>
         </td>
       </tr>
     </table>
-
+    </div>
     <div id="tabbox">
-      <button id=buttomImageMode>Image</button>
-      <button id=buttonTextMode>Text</button>
-      <button id=buttonToggleDebug>Debug</button>
       <input id="pageDataOut" size="50"/> 
       <div id=tab1>
         <canvas id="cOut" width="1200" height="1200" style="border:1px solid red;">

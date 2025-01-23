@@ -19,7 +19,7 @@
       <li><b>Total Chunks (integer)</b> - the total number of chunks for this file.</li>
       <li><b>CRC32 (integer)</b> - the CRC32 for the entire file.</li>
       <li><b>Filename (string, optional)</b> - a file name to save the file as once it's done transferring.</li>
-      <li><b>encode (string, optional)</b> - B64, or B10 for base64 encoding or base10 encoding, LB6 or LB1 for base64 encoding or base10 encoding of LZMA'd data.
+      <li><b>encode (string, optional)</b> - B64, or B10 for base64 encoding or base10 encoding, LB1 for base10 encoding of LZMA'd data. (the generator can encode Base64 of an LZMA but this is fairly useless)
     </ul>
 
     <h2>References</h2>
@@ -29,6 +29,7 @@
       <li><a href=https://www.nayuki.io/page/qr-code-generator-library>https://www.nayuki.io/page/qr-code-generator-library</a> Used for Javascript generator and modern C generator</li>
       <li><a href=https://github.com/ricmoo/QRCode>https://github.com/ricmoo/QRCode</a> Used for legacy C generator</li>
       <li><a href=https://davidshimjs.github.io/qrcodejs/>https://davidshimjs.github.io/qrcodejs/</a> Used to prototype JavaScript generator.</li>
+      <li><a href=https://github.com/LZMA-JS/LZMA-JS>https://github.com/LZMA-JS/LZMA-JS</a> LZMA-JS - used with decompress modified not to convert to a string.</li> <!-- clone LZMA-JS, npm install uglify-js, remove decode function from lzma_worker, remove two calls to decode( and run node minify.js in the clone root.  Copy lzma_worker-min.js here-->
     </ul>
   </body>
 </html>

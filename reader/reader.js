@@ -274,7 +274,9 @@ function getMimeType(extension) {
 var cachedOutString = "";
 var cachedB10Decode = "";
 var cachedLZMAOut = "";
-var cachedEncode = "";
+var cachedDecode = "";
+var cachedArrayBuffer = "";
+
 function update_file_download_links()
 {
   var d = document.getElementById("file-links");
@@ -290,20 +292,25 @@ function update_file_download_links()
       cachedOutString = outString;
       cachedB10Decode = b10decode( outString );
       cachedLZMAOut = LZMA.decompress( cachedB10Decode );
-      cachedEncode = new TextEncoder("Latin1").encode( cachedLZMAOut );
+      cachedDecode = new TextDecoder("Latin1").decode( new Uint8Array( cachedLZMAOut ) );
+      cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
+      //cachedEncode = new TextEncoder("Latin1").encode( cachedLZMAOut );
+      b64Result = _arrayBufferToBase64( cachedArrayBuffer );      
       if( bDebug )
       {
         console.log( cachedOutString )
         console.log( cachedB10Decode );
         console.log( cachedLZMAOut );
-        console.log( cachedEncode );
+        console.log( cachedDecode );
+        console.log( cachedArrayBuffer );
+        console.log( b64Result );
       }
 
-      b64Result = _arrayBufferToBase64(new TextEncoder("Latin1").encode( LZMA.decompress( b10decode(outString) ) ));      
     }
     else if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
     {
-      b64Result = _arrayBufferToBase64( b10decode( outString ) );
+      var szStr = b10decode( outString );
+      b64Result = _arrayBufferToBase64( szStr );
     }
     else if( knownCRCEncoding[ keysFf[i] ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
     {
@@ -320,7 +327,11 @@ function update_file_download_links()
                 + "data:text/plain;base64," + b64Result
                 + "\">"
                 + filename
-                + "</a></li>\n";
+                + "</a>"
+                + "(<a onclick=\""
+                + "makePopupOfCrc(" + keysFf[i]
+                + ")\")>Open</a>)"
+                + "</li>\n";
     if( hasImageExtensionRegex( filename ) )
     {
       const base64Data = b64Result;
@@ -330,6 +341,40 @@ function update_file_download_links()
     }
   }
   d.innerHTML += "</ul>";
+}
+
+function makePopupOfCrc(szCrc)
+{
+  makePopupOfString("Not yet implemented.");
+}
+
+function makePopupOfString(szString)
+{
+  const popupWindow = window.open("", "popupWindow", "width=600,height=400");
+  popupWindow.document.innerHTML = "";
+  pageid = 0;
+  // Write the random text to the new window
+  var iFontsize = "200px";
+  popupWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+          body{
+          font-size: ` + iFontsize + `px;
+          }
+        </style>
+       <title>Static Page</title>
+      </head>
+      <body>`);
+    popupWindow.document.write(szString)
+    popupWindow.document.write(`
+    </body>
+    </html>
+  `);
+
 }
 /*
  * When the page is ready and interactive, scanning attempts start.

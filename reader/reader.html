@@ -1,11 +1,24 @@
 <html>
   <head>
-    <title>Html-Qrcode Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HotQR Scanner">
+    <link rel="apple-touch-icon" sizes="144x144" href="htqr_read.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json">
+    <title>HotQR Scanner Demo</title>
 <style>
 #qr-reader-results
 {
   font-size: 12px;
 }
+#buttonStart, #buttonClearHistory
+{
+  height: 40px;
+  width: 50px;
+}
+
 </style>
     <body>
       <div id="toolbar">
@@ -21,23 +34,23 @@
           <input id="inputTextOut" />
         </td>
         <td>
-        FPS:
+          FPS:<br/>
           <input type="number" id="ifps" value="20" min="1" max="60"/>
         </td>
         <td>
-        Box: 
-          <input type="number" id="ibox" value="350" min="1" max="500"/>
+          Box: <br/>
+          <input type="number" id="ibox" value="300" min="1" max="500"/>
         </td>
         </tr>
         </table>
       </div>
-      <div id="qr-reader" style="width:500px"></div>
-      <div id="scanview" style="width:500px"></div>
+      <div id="qr-reader" style="width:420px"></div>
+      <div id="scanview" style="width:420px"></div>
       <div id="file-links"></div>
       <div id="qr-reader-results"></div>
     </body>
     <script src="html5-qrcode.min.js"></script>
     <script src="reader.js"></script>
-    <script src="lzma_worker-min.js"></script>    
+    <script src="lzma_worker-min.js"></script>
   </head>
 </html>

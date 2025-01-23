@@ -9,6 +9,7 @@ var qrGenInterval = null;
 
 //prefix to beginning of string
 var qStrPrefix = "Q";
+
 /*
  * Start the qr code refresh timer.  Replaces any previous interval if needed.
  */
@@ -319,11 +320,15 @@ function ui_loadFileToInput()
       //console.log(reader.result);
       const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
       var fileContents = reader.result;
+      if( bQrSplitterDebug )
+      {
+        console.log(fileContents);
+      }
       cachedFileContentsRaw = fileContents;
       if( bLzma )
       {
         fileContents = LZMA.compress( new Uint8Array(fileContents), 9 );
-        console.log(fileContents);
+        if(bQrSplitterDebug) console.log(fileContents);
       }
 
       cachedFileContents = fileContents;
@@ -467,6 +472,15 @@ document.getElementById('buttonToggleDebug').addEventListener("click",function()
   {
     bQrSplitterDebug = !bQrSplitterDebug;
     console.log("Debug now set to: " + bQrSplitterDebug );
+  });
+document.getElementById('buttonToggleControls').addEventListener("click",function()
+  {
+    var x = document.getElementById('controlBox');
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
   });
 document.getElementById('buttonToStaticPage').addEventListener("click", makeStaticPage);
 document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);

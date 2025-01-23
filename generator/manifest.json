@@ -1,0 +1,13 @@
+{
+  "name": "HotQR Generator",
+  "short_name": "HotQRGen",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "white",
+  "description": "HotQR Generator",
+  "icons": [{
+    "src": "htqr_gen.png",
+    "sizes": "144x144",
+    "type": "image/png"
+    }]
+}
