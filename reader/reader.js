@@ -1,6 +1,7 @@
 //regex to check if is base64
 var base64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
 
+var bDebug = false;
 //dictionary to hold scans - key is the scan data to facilitate keeping unique ones only.
 var dScans = {};
 
@@ -220,8 +221,11 @@ function processScanData()
       {
         outString += knownCRCScans[currentCrc][ currentCrcScanKeys[j] ];
       }
-      //console.log( "data:text/plain;base64," + 
-      //  btoa(unescape(encodeURIComponent(outString ))) );
+      if( bDebug )
+      {
+        console.log( "data:text/plain;base64," + 
+        btoa(unescape(encodeURIComponent(outString ))) );
+      }
       finishedFiles[ currentCrc ] = outString;
       update_file_download_links();
     }
@@ -267,6 +271,10 @@ function getMimeType(extension) {
 /*
  * Call from processScanData when a new file is finished to update the links.
  */
+var cachedOutString = "";
+var cachedB10Decode = "";
+var cachedLZMAOut = "";
+var cachedEncode = "";
 function update_file_download_links()
 {
   var d = document.getElementById("file-links");
@@ -277,7 +285,23 @@ function update_file_download_links()
     var outString = finishedFiles[ keysFf[i]];
     var b64Result = "";
     var filename = knownCRCFilename[ keysFf[i] ];
-    if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
+    if( knownCRCEncoding[ keysFf[i] ] == 'LB1' )
+    {
+      cachedOutString = outString;
+      cachedB10Decode = b10decode( outString );
+      cachedLZMAOut = LZMA.decompress( cachedB10Decode );
+      cachedEncode = new TextEncoder("Latin1").encode( cachedLZMAOut );
+      if( bDebug )
+      {
+        console.log( cachedOutString )
+        console.log( cachedB10Decode );
+        console.log( cachedLZMAOut );
+        console.log( cachedEncode );
+      }
+
+      b64Result = _arrayBufferToBase64(new TextEncoder("Latin1").encode( LZMA.decompress( b10decode(outString) ) ));      
+    }
+    else if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
     {
       b64Result = _arrayBufferToBase64( b10decode( outString ) );
     }
