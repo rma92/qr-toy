@@ -200,44 +200,17 @@ function splitStringByCategory(input, min_length) {
     return result;
 }
 
-
-function makeCodeIntSegments (qStr, ecc)
-{
-  var qr;
-  var strs = splitStringByCategory(qStr, 10);
-  var segs = [];  
-  for(var i = 0; i < strs.length; ++i )
-  {
-    if( /[0-9]/.test( strs[i] ) )
-    {
-      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i]) );
-    }
-    else
-    {
-      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
-    }
-  }
-  qr = qrcodegen.QrCode.encodeSegments(segs, ecc);
-  return qr;
-}
-
 /*
- * Generates the Qr Code and puts it as text and the image.
+ * Render and return a qrcodegen.QrCode.
+ *
+ * The only required parameter is an array of segments.
+ *
+ * This is usually be called from generateQr
  */
-function makeCodeInt (qStr)
+function generateQrFromSegs(aSegs, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
 {
-  if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
-  document.getElementById('strlen').value = qStr.length;
-
-  if( qStr.length > 12680 )
-  {
-    clearInterval( qrGenInterval );
-    document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
-    return;
-  }
-
-  var eccStr = document.getElementById('eccLevel').value
-  var ecc = qrcodegen.QrCode.Ecc.LOW;
+  //TODO: Add any graphical functionality to this function
+  var ecc;
   if( eccStr == 'L' )
   {
     ecc = qrcodegen.QrCode.Ecc.LOW;
@@ -254,9 +227,73 @@ function makeCodeInt (qStr)
   {
     ecc = qrcodegen.QrCode.Ecc.HIGH;
   }
-  //var qr = qrcodegen.QrCode.encodeText(qStr, ecc);
-  //var qr = makeCodeIntSegments("abc", qrcodegen.QrCode.Ecc.MEDIUM);
-  var qr = makeCodeIntSegments(qStr, ecc);
+  try
+  {
+    var qr = qrcodegen.QrCode.encodeSegments(aSegs, ecc, parseInt(minVersion), parseInt(maxVersion), parseInt(mask), boostEcl);
+  }
+  catch(ex)
+  {
+    document.getElementById("pageDataOut").value = ex.message;
+    throw ex;
+  }
+  return qr;
+}
+
+/*
+ * Segments a string by character type to fit into the QR code more efficiently,
+ * then generates the QR code.
+ */
+function generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
+{
+  var qr;
+  var strs = splitStringByCategory(qStr, 10);
+  var segs = [];  
+  for(var i = 0; i < strs.length; ++i )
+  {
+    if( /[0-9]/.test( strs[i] ) )
+    {
+      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i]) );
+    }
+    else
+    {
+      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
+    }
+  }
+  qr = generateQrFromSegs(segs, eccStr, minVersion, maxVersion, mask, boostEcl)
+  return qr;
+}
+
+/*
+ * Generates the Qr Code and puts it as text and the image.
+ *
+ * This is the main mid-level invocation to creating a code from the user side.
+ */
+function makeCodeInt (qStr)
+{
+  if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
+  document.getElementById('strlen').value = qStr.length;
+
+  if( qStr.length > 12680 )
+  {
+    clearInterval( qrGenInterval );
+    document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
+    return;
+  }
+
+  var eccStr = document.getElementById('eccLevel').value;
+  var minVersion = document.getElementById('iMinVersion').value;
+  var maxVersion = document.getElementById('iMinVersion').value;
+  var iMask = document.getElementById('iMask').value;
+  //generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
+  try
+  {
+    var qr = generateQr(qStr, eccStr, minVersion, maxVersion, iMask, true);
+  }
+  catch(ex)
+  {
+    document.getElementById("pageDataOut").value = ex.message;
+    return;
+  }
   cachedLastQr = qr;
   var oStr = "";
   for(var y = 0; y < qr.modules.length; ++y )
@@ -458,6 +495,9 @@ document.getElementById('scale').addEventListener("input", ui_makeCode);
 document.getElementById('eccLevel').addEventListener("change", ui_makeCode);
 document.getElementById('split_size').addEventListener("input", ui_makeCode);
 document.getElementById('split_time').addEventListener("input", ui_makeCode);
+document.getElementById('iMask').addEventListener("input", ui_makeCode);
+document.getElementById('iMinVersion').addEventListener("input", ui_makeCode);
+document.getElementById('iMaxVersion').addEventListener("input", ui_makeCode);
 document.getElementById('buttomImageMode').addEventListener("click",function()
   {
     document.getElementById('tab1').style.display = "block";

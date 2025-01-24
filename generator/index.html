@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" sizes="144x144" href="htqr_gen.png">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <script type="text/javascript" src="qrcodegen-v1.8.0-es5.js"></script>
+    <script type="text/javascript" src="qrcodegen-v1.8.0-es6.js"></script>
     <style>
 #qrcode
   {
@@ -21,6 +21,10 @@
 #fileInput
 {
   width: 200px;
+}
+#scale, #split_size, #eccLevel, #split_time
+{
+  width: 60px;
 }
     </style>
   </head>
@@ -35,8 +39,8 @@
     <textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
     <table>
       <tr>
-        <td>ECC Level:</td>
-        <td>
+        <td>ECC Level:
+          <br/>
           <select id="eccLevel">
             <option value="L">L (7%)</option>
             <option value="M">M (15%)</option>
@@ -50,9 +54,34 @@
           <input type="number" id="scale" value="18" min="1" max="32"/>
         </td>
         <td>
-          Length:
+          CurLength:
           <br/>
           <input id="strlen" type="text" readonly="true" value="-1" size=6 />
+        </td>
+        <td>
+          Mask:
+          <br/>
+          <select id="iMask" name="iMask">
+            <option value="-1">-1</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+          </select>
+        </td>
+        <td>
+          MinVer:
+          <br/>
+          <input type="number" id="iMinVersion" value="1" min="1" max="40"/>
+        </td>
+        <td>
+          MaxVer:
+          <br/>
+          <input type="number" id="iMaxVersion" value="40" min="1" max="40"/>
         </td>
       </tr>
       <tr>
@@ -66,7 +95,7 @@
           <br/>
           <input id="split_time" type="number" value="1000" min=1 max=10000 /> ms
         </td>
-        <td colspan=2>
+        <td colspan=3>
           Filename:
           <br/>
           <input id="szFilename" value="out.txt" />
