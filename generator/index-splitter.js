@@ -383,19 +383,25 @@ function renderQr(qr)
   if( document.getElementById('szRenderer').value ) renderer = document.getElementById('szRenderer').value;
   if( document.getElementById('szWhiteColor').value ) whiteColor = document.getElementById('szWhiteColor').value;
   if( document.getElementById('szBlackColor').value ) blackColor = document.getElementById('szBlackColor').value;
+  
+  var backgroundStyle = "#ffffff";
 
   var dCanvas = document.getElementById('cOut');
   if( renderer == "circle" )
   {
-    renderQr_graphicsCircle(dCanvas, qr, scale, whiteColor, blackColor);
+    renderQr_graphicsCircle(dCanvas, qr, scale, whiteColor, blackColor, backgroundStyle);
   }
   else if( renderer == "circle2" )
   {
-    renderQr_graphicsCircle2(dCanvas, qr, scale, whiteColor, blackColor);
+    renderQr_graphicsCircle2(dCanvas, qr, scale, whiteColor, blackColor, backgroundStyle);
+  }
+  else if( renderer == "general" )
+  {
+    renderQr_graphicsDefault(dCanvas, qr, scale, whiteColor, blackColor, backgroundStyle);
   }
   else
   {
-    renderQr_graphicsDefault(dCanvas, qr, scale, whiteColor, blackColor);
+    renderQr_Extended(renderer, dCanvas, qr, scale, whiteColor, blackColor, backgroundStyle);
   }
 }//renderQr
 
