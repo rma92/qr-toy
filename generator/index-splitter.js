@@ -4,11 +4,16 @@
 //if enabled, debug to console.
 var bQrSplitterDebug = false;
 
+//strings to split header fields and header from data.
+var szHeaderSeparator = "$";
+var szHeaderTerminator = "$$";
+
 // Timer to generate the next QR code
 var qrGenInterval = null;
 
 //prefix to beginning of string
-var qStrPrefix = "Q";
+//var qStrPrefix = "Q";
+var qStrPrefix = "HTTP://QR.HT/";
 
 /*
  * Start the qr code refresh timer.  Replaces any previous interval if needed.
@@ -152,14 +157,14 @@ function makeCodeByChunkId( pageid )
   const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
   if( encodingType === 'base64' )
   {
-    fileData = (bLzma)?":LB6":":B64";
+    fileData = (bLzma)?"LB6":"B64";
   }
   else if( encodingType === 'base10' )
   {
-    fileData = (bLzma)?":LB1":":B10";
+    fileData = (bLzma)?"LB1":"B10";
   }
 
-  qStr = qStrPrefix + ":" + pageid + ":" + chunks.length + ":" + icrc32 + ":" + szFilename + fileData + "::" + chunks[pageid];
+  qStr = qStrPrefix + szHeaderSeparator + pageid + szHeaderSeparator + chunks.length + szHeaderSeparator + icrc32 + szHeaderSeparator + szFilename + szHeaderSeparator + fileData + szHeaderTerminator + chunks[pageid];
   //qStr = "Q:" + pageid + ":" + chunks.length + ":" + icrc32 + "::" + chunks[pageid];
   if( bQrSplitterDebug ) console.log( "makeNextCode - qString: " + qStr);
   makeCodeInt( qStr );
@@ -227,15 +232,7 @@ function generateQrFromSegs(aSegs, eccStr = 'L', minVersion = 1, maxVersion = 40
   {
     ecc = qrcodegen.QrCode.Ecc.HIGH;
   }
-  try
-  {
-    var qr = qrcodegen.QrCode.encodeSegments(aSegs, ecc, parseInt(minVersion), parseInt(maxVersion), parseInt(mask), boostEcl);
-  }
-  catch(ex)
-  {
-    document.getElementById("pageDataOut").value = ex.message;
-    throw ex;
-  }
+  var qr = qrcodegen.QrCode.encodeSegments(aSegs, ecc, parseInt(minVersion), parseInt(maxVersion), parseInt(mask), boostEcl);
   return qr;
 }
 
@@ -264,12 +261,152 @@ function generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = 
 }
 
 /*
+ * Render a qrcodegen.QrCode to a string
+ */
+function renderQrToString(qr)
+{
+  var oStr = "";
+  for(var y = 0; y < qr.modules.length; ++y )
+  {
+    for(var x = 0; x < qr.modules[y].length; ++x )
+    {
+      oStr += (qr.modules[y][x])?"#":" ";
+    }
+    oStr += "\r\n";
+  }
+  return oStr;
+}
+
+/*
+renderQr the normal way - just pixels of specified color/fillstyle
+
+Manual invocation:
+renderQr_graphicsDefault(document.getElementById('cOut'), cachedLastQr, parseInt(document.getElementById('scale').value)); 
+ */
+function renderQr_graphicsDefault(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
+{
+  var qrCodeSize = (qr.modules.length)* scale;
+
+  var offsetX = 10;
+  var offsetY = 10;
+
+  dCanvas.width = qrCodeSize + offsetX * 2;
+  dCanvas.height = qrCodeSize + offsetY * 2;
+  var ctx = dCanvas.getContext('2d');
+  ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+  ctx.fillStyle = backgroundStyle;
+  ctx.fillRect(0,0, dCanvas.width, dCanvas.height);
+  for(var y = 0; y < qr.modules.length; ++y )
+  {
+    for(var x = 0; x < qr.modules[y].length; ++x )
+    {
+      ctx.fillStyle = (qr.modules[y][x])?fillStyleBlack:fillStyleWhite;
+      ctx.fillRect(x*scale+offsetX, y*scale+offsetY, scale, scale);      
+    }
+  }
+}//renderQr_graphicsDefault
+
+function renderQr_graphicsCircle(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
+{
+  var qrCodeSize = (qr.modules.length)* scale;
+
+  var offsetX = 10;
+  var offsetY = 10;
+
+  dCanvas.width = qrCodeSize + offsetX * 2;
+  dCanvas.height = qrCodeSize + offsetY * 2;
+  var ctx = dCanvas.getContext('2d');
+  ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+  ctx.fillStyle = backgroundStyle;
+  ctx.fillRect(0,0, dCanvas.width, dCanvas.height);
+  for(var y = 0; y < qr.modules.length; ++y )
+  {
+    for(var x = 0; x < qr.modules[y].length; ++x )
+    {
+      ctx.fillStyle = (qr.modules[y][x])?fillStyleBlack:fillStyleWhite;
+      //ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
+      ctx.beginPath();      
+      ctx.ellipse(x*scale+offsetX + scale /2 , y*scale+offsetY + scale / 2, scale/2, scale/2, 0, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
+}//renderQr_graphicsCircle
+
+function renderQr_graphicsCircle2(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
+{
+  var qrCodeSize = (qr.modules.length)* scale;
+
+  var offsetX = 10;
+  var offsetY = 10;
+
+  dCanvas.width = qrCodeSize + offsetX * 2;
+  dCanvas.height = qrCodeSize + offsetY * 2;
+  var ctx = dCanvas.getContext('2d');
+  ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+  ctx.fillStyle = backgroundStyle;
+  ctx.fillRect(0,0, dCanvas.width, dCanvas.height);
+  for(var y = 0; y < qr.modules.length; ++y )
+  {
+    for(var x = 0; x < qr.modules[y].length; ++x )
+    {
+      ctx.fillStyle = (qr.modules[y][x])?fillStyleBlack:fillStyleWhite;
+      //ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
+      ctx.beginPath();      
+      ctx.ellipse(x*scale+offsetX + scale /2 , y*scale+offsetY + scale / 2, scale/2, scale/2, 0, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = fillStyleBlack;
+      ctx.strokeStyle = fillStyleBlack;
+      ctx.beginPath();      
+      ctx.ellipse(x*scale+offsetX + scale /2 , y*scale+offsetY + scale / 2, scale/2, scale/2, 0, 0, 2 * Math.PI);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+}//renderQr_graphicsCircle2
+
+/*
+ * Render a qrcodegen.QrCode to the text and canvas.
+ */
+function renderQr(qr)
+{
+  //text render
+  var oStr = renderQrToString(qr);
+  document.getElementById('textOut').value = oStr;
+
+  //graphics render
+  var scale = 2;
+  var renderer = "general";
+  var whiteColor = "#ffffff";
+  var blackColor = "#000000";
+  if( document.getElementById('scale').value ) scale = document.getElementById('scale').value;
+  if( document.getElementById('szRenderer').value ) renderer = document.getElementById('szRenderer').value;
+  if( document.getElementById('szWhiteColor').value ) whiteColor = document.getElementById('szWhiteColor').value;
+  if( document.getElementById('szBlackColor').value ) blackColor = document.getElementById('szBlackColor').value;
+
+  var dCanvas = document.getElementById('cOut');
+  if( renderer == "circle" )
+  {
+    renderQr_graphicsCircle(dCanvas, qr, scale, whiteColor, blackColor);
+  }
+  else if( renderer == "circle2" )
+  {
+    renderQr_graphicsCircle2(dCanvas, qr, scale, whiteColor, blackColor);
+  }
+  else
+  {
+    renderQr_graphicsDefault(dCanvas, qr, scale, whiteColor, blackColor);
+  }
+}//renderQr
+
+/*
  * Generates the Qr Code and puts it as text and the image.
  *
  * This is the main mid-level invocation to creating a code from the user side.
  */
 function makeCodeInt (qStr)
 {
+  //Error checking
   if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
   document.getElementById('strlen').value = qStr.length;
 
@@ -280,9 +417,10 @@ function makeCodeInt (qStr)
     return;
   }
 
+  //Make the QR Code
   var eccStr = document.getElementById('eccLevel').value;
   var minVersion = document.getElementById('iMinVersion').value;
-  var maxVersion = document.getElementById('iMinVersion').value;
+  var maxVersion = document.getElementById('iMaxVersion').value;
   var iMask = document.getElementById('iMask').value;
   //generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
   try
@@ -292,44 +430,12 @@ function makeCodeInt (qStr)
   catch(ex)
   {
     document.getElementById("pageDataOut").value = ex.message;
+    console.log(ex.message);
     return;
   }
   cachedLastQr = qr;
-  var oStr = "";
-  for(var y = 0; y < qr.modules.length; ++y )
-  {
-    for(var x = 0; x < qr.modules[y].length; ++x )
-    {
-      oStr += (qr.modules[y][x])?"#":" ";
-    }
-    oStr += "\r\n";
-  }
-  document.getElementById('textOut').value = oStr;
-
-  var scale = 2;
-  if( document.getElementById('scale').value )
-  {
-    scale = document.getElementById('scale').value;
-  }
-
-  var qrCodeSize = Math.ceil(Math.sqrt( oStr.length )) * scale;
-
-  var offsetX = 10;
-  var offsetY = 10;
-
-  var dCanvas = document.getElementById("cOut");
-  dCanvas.width = qrCodeSize + offsetX * 2;
-  dCanvas.height = qrCodeSize + offsetY * 2;
-  var ctx = dCanvas.getContext('2d');
-  ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
-  for(var y = 0; y < qr.modules.length; ++y )
-  {
-    for(var x = 0; x < qr.modules[y].length; ++x )
-    {
-      ctx.fillStyle = (qr.modules[y][x])?"black":"white";
-      ctx.fillRect(x*scale+offsetX, y*scale+offsetY, scale, scale);      
-    }
-  }
+  renderQr(qr);
+  //Draw the QR code.
 }//makeCodeInt(qStr)
 
 //Calls makecode in response to a UI change.
@@ -356,19 +462,22 @@ function ui_loadFileToInput()
       let encoded;
       //console.log(reader.result);
       const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
-      var fileContents = reader.result;
+      var fileContents = new Uint8Array( reader.result );
       if( bQrSplitterDebug )
       {
         console.log(fileContents);
       }
       cachedFileContentsRaw = fileContents;
+      document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength;
       if( bLzma )
       {
-        fileContents = LZMA.compress( new Uint8Array(fileContents), 9 );
+        fileContents = new Uint8Array( LZMA.compress( new Uint8Array(fileContents), 9 ) );
         if(bQrSplitterDebug) console.log(fileContents);
+        document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength;
       }
 
       cachedFileContents = fileContents;
+
       if (encodingType === 'base64')
       {
         //if the split_size is a default, change ui settings for splitter
@@ -498,6 +607,9 @@ document.getElementById('split_time').addEventListener("input", ui_makeCode);
 document.getElementById('iMask').addEventListener("input", ui_makeCode);
 document.getElementById('iMinVersion').addEventListener("input", ui_makeCode);
 document.getElementById('iMaxVersion').addEventListener("input", ui_makeCode);
+document.getElementById('szRenderer').addEventListener("input", ui_makeCode);
+document.getElementById('szWhiteColor').addEventListener("input", ui_makeCode);
+document.getElementById('szBlackColor').addEventListener("input", ui_makeCode);
 document.getElementById('buttomImageMode').addEventListener("click",function()
   {
     document.getElementById('tab1').style.display = "block";

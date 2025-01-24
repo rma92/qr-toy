@@ -1,5 +1,8 @@
 //regex to check if is base64
 var base64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
+//strings to split header fields and header from data.
+var szHeaderSeparator = "$";
+var szHeaderTerminator = "$$";
 
 var bDebug = false;
 //dictionary to hold scans - key is the scan data to facilitate keeping unique ones only.
@@ -114,10 +117,10 @@ function docReady(fn)
 
 function processSingleScan(szScan)
 {
-   var a = szScan.split("::");
+   var a = szScan.split( szHeaderTerminator );
     if( a.length == 2 )
     {
-      var aheaders = a[0].split(':');
+      var aheaders = a[0].split( szHeaderSeparator );
       if( aheaders.length >= 4 )
       {
         var crc = aheaders[3];
@@ -421,8 +424,10 @@ document.getElementById("buttonStart").addEventListener("click",function()
 
 function testShortScan()
 {
-  var s1 = "Q:0:2:3497144816:out.txt::http://r";
-  var s2 = "Q:1:2:3497144816:out.txt::m.vg/";
+  var s1 = "HTTP://QR.HT/$0$2$3497144816$out.txt$$http://r";
+  var s2 = "HTTP://QR.HT/$1$2$3497144816$out.txt$$m.vg/";
+  processSingleScan( s1 );
+  processSingleScan( s2 );
   dScans[ s1 ] = 1;
   dScans[ s2 ] = 1;
 }

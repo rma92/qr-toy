@@ -22,9 +22,21 @@
 {
   width: 200px;
 }
-#scale, #split_size, #eccLevel, #split_time
+#eccLevel, #split_size
 {
   width: 60px;
+}
+#scale, #split_time, #strlen
+{
+  width: 50px;
+}
+#iMinVersion, #iMaxVersion
+{
+  width: 30px;
+}
+#szRenderer, #szWhiteColor, #szBlackColor
+{
+  width: 80px;
 }
     </style>
   </head>
@@ -38,6 +50,7 @@
     <div id=controlBox>
     <textarea id="text" style="width:80%">http://rm.vg/</textarea><br />
     <table>
+      <tr><th colspan=4>QRcode</th></tr>
       <tr>
         <td>ECC Level:
           <br/>
@@ -91,9 +104,9 @@
           <input id="split_size" type="number" value="0" min=0 max=8000 />
         </td>
         <td>
-          Split Time:
+          Split Time (ms):
           <br/>
-          <input id="split_time" type="number" value="1000" min=1 max=10000 /> ms
+          <input id="split_time" type="number" value="1000" min=1 max=10000 />
         </td>
         <td colspan=3>
           Filename:
@@ -103,6 +116,9 @@
       </tr>
     </table>
     <table>
+      <tr>
+        <th colspan=4>Load File</th>
+      </tr>
       <tr>
         <td>
           File:<br/>
@@ -118,10 +134,35 @@
         </td>
         <td>
           <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
+          <span id="fileSizeOut">(filesize)</span>
       </tr>
+    </table>
+    <table>
+      <tr><th colspan=4>Preprocessor</th></tr>
+    </table>
+    <table>
+      <tr><th colspan=4>Render</th></tr>
+      <tr>
+        <td>
+          Renderer:<br/>
+          <select id="szRenderer" name="szRenderer">
+            <option value="general">general</option>
+            <option value="circle">circle</option>
+            <option value="circle2">circleAll</option>
+          </select>
+        </td>
+        <td>
+          White:<br/>
+          <input id="szWhiteColor" value="#ffffff" />          
+        </td>
+        <td>
+          Black:<br/>
+          <input id="szBlackColor" value="#000000" />          
+        </td>
     </table>
     <hr/>
     <table>
+      <tr><th colspan=4>Static Output</th></tr>
       <tr>
         <td>
           <button id=buttonToStaticPage>Make Static Page</button>
@@ -132,7 +173,7 @@
           <input type="radio" name="staticPageAs" id="staticPageAsTable" value="table"/>Table
         </td>
         <td>
-          <input type="checkbox" name="staticPageLabel" id="staticPageLabel" />Label codes
+          <input type="checkbox" name="staticPageLabel" id="staticPageLabel" checked/>Label codes
         </td>
         <td>
           FontSize:
