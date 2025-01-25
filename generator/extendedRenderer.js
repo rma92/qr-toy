@@ -46,8 +46,9 @@ function square_spacer(ctx2, x, y, iScale, lineWidth)
  * Ultra ball: #222
  * Master ball: #a349a3
  */
-function pokeBall(ctx2, x, y, iScale, lineWidth, offsetX = 2, offsetY = 2, lineColor = "black", topFillColor = '#e00', bottomFillColor = '#eee')
+function pokeBall(ctx2, x, y, iScale, lineWidth, offsetX = 2, offsetY = 2, lineColor = "black", topFillColor = '#e00', bottomFillColor = '#bbb')
 {
+  if(bQrSplitterDebug && bQrSplitterDebug == true) console.log(topFillColor);
   ctx2.strokeStyle = lineColor;
   ctx2.lineWidth = lineWidth;
   ctx2.beginPath();
@@ -86,6 +87,35 @@ function renderQr_pokeball(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", f
 {
   var qrCodeSize = (qr.modules.length)* scale;
 
+  var iLineWidth = -1; 
+  if( document.getElementById("iPokeballLineWidth").value )
+  {
+    iLineWidth = parseInt(document.getElementById("iPokeballLineWidth").value);
+  }
+  if( iLineWidth == -1 )
+  {
+    iLineWidth = parseInt( scale / 4 );
+  }
+  var szLineColor = "#0a0"; 
+  if( document.getElementById("szPokeballLineColor").value )
+  {
+    szLineColor = document.getElementById("szPokeballLineColor").value;
+  }
+  var szBottomColor = "#000"; 
+  if( document.getElementById("szPokeballBottomColor").value )
+  {
+    szBottomColor = document.getElementById("szPokeballBottomColor").value;
+  }
+  var colorList = ""; 
+  if( document.getElementById("szPokemonCustomColor").value )
+  {
+    colorList = document.getElementById("szPokeballColor").value;
+  }
+  var szRenderer = "poke";
+  if(  document.getElementById("szPokeballColor").value )
+  {
+    szRenderer = document.getElementById("szPokeballColor").value;
+  }
   var offsetX = 10;
   var offsetY = 10;
   dCanvas.width = qrCodeSize + offsetX * 2;
@@ -101,7 +131,53 @@ function renderQr_pokeball(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", f
     {
       if(qr.modules[y][x])
       {
-        pokeBall(ctx, x, y, scale, 3, offsetX, offsetY);
+        if( szRenderer == "poke" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, "#e00", szBottomColor);
+        }
+        else if( szRenderer == "great" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, "#00e", szBottomColor);
+        }
+        else if( szRenderer == "ultra" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, "#222", szBottomColor);
+        }
+        else if( szRenderer == "master" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, "#a349a3", szBottomColor);
+        }
+        else if( szRenderer == "polandball" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, szBottomColor, "#e00");
+
+        }
+        else if( szRenderer == "voltorb" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, "#e00", szBottomColor);
+        }
+        else if( szRenderer == "electrode" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, szBottomColor, "#e00");
+        }
+        else if( szRenderer == "randompokeball" )
+        {
+          var topColors = ["#e00", "#00e", "#222", "#a349a3"];
+          var tC = topColors[Math.floor(Math.random()*topColors.length)];          
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, tC);
+        }
+        else if( szRenderer == "randompokeballelectrode" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, szBottomColor);
+        }
+        else if( szRenderer == "custom" )
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY, szLineColor, szBottomColor);
+        }
+        else
+        {
+          pokeBall(ctx, x, y, scale, iLineWidth, offsetX, offsetY);
+        }
       }
       else
       {
@@ -130,4 +206,62 @@ function renderQr_Extended(renderer, dCanvas, qr, scale = 2, fillStyleWhite = "#
   }
 }
 
+/*
+ * Call this to add the renderer's options to the HTML element with the id domidControlsOut.
+ */
+function rendererDropdownChangedEx(szRenderer, domidControlsOut)
+{
+  var domObj = document.getElementById(domidControlsOut);
+  if( !domObj )
+  {
+    console.log("No output for controls - rendererDropdownChangedEx!");
+    return;
+  }
+  if( szRenderer == "pokeball" )
+  {
+    domObj.innerHTML += `
+        <table>
+        <tr>
+        <td>
+          Pokeball Color:
+          <select id="szPokeballColor" name="szPokeballColor" style="width: 50px">
+            <option value="poke">Poke</option>
+            <option value="great">Great</option>
+            <option value="ultra">Ultra</option>
+            <option value="master">Master</option>
+            <option value="polandball">Polandball</option>
+            <!--<option value="voltorb">Voltorb</option>-->
+            <!--<option value="electrode">Electrode</option>-->
+            <option value="randompokeball">RandomPokeball</option>
+            <!--<option value="randompokeballelectrode">RandomPokeball+Electrode</option>-->
+            <!--<option value="custom">Custom</option>-->
+          </select>
+          </td>
+          <td>
+          Custon Pokeball Top Color<br/>
+          <input id="szPokemonCustomColor" value="#e00" style="width: 60px"/>
+          </td>
+          <td>
+          LineWidth (-1 for auto):<br/>
+          <input type="number" id="iPokeballLineWidth" value="-1" min="-1" max="32"/>          
+          </td>
+          <td>
+          LineColor:<br/>
+          <input id="szPokeballLineColor" value="#222"  style="width: 60px"/>          
+          </td>
+          <td>
+          BottomColor:<br/>
+          <input id="szPokeballBottomColor" value="#bbb"  style="width: 60px"/>          
+          </td>
+          </tr>
+          </table>
+    `;
+    document.getElementById('szPokeballColor').addEventListener("input", ui_makeCode);
+    document.getElementById('szPokemonCustomColor').addEventListener("input", ui_makeCode);
+    document.getElementById('iPokeballLineWidth').addEventListener("input", ui_makeCode);
+    document.getElementById('szPokeballLineColor').addEventListener("input", ui_makeCode);
+    document.getElementById('szPokeballBottomColor').addEventListener("input", ui_makeCode);
+  }
+}
 addRendererToDropdown("pokeball", "Pokeball");
+//TODO: Write a function to run when the renderer dropdown changes to add controls to the table if needed for the specific renderer.

@@ -602,6 +602,24 @@ function makeStaticPage()
   `);
 }
 
+//called when the renderer dropdown is changed.
+function rendererDropdownChanged() {
+  var szRenderer = document.getElementById('szRenderer').value;
+  var domidControlsOut = "domExpandedRenderOptions";
+
+  if( szRenderer == 'general' || szRenderer == 'circle' || szRenderer == 'circle2' )
+  {
+    document.getElementById(domidControlsOut).innerHTML = "";
+  }
+  else
+  {
+    if(rendererDropdownChangedEx)
+    {
+      rendererDropdownChangedEx(szRenderer, domidControlsOut );
+    }
+  }
+}
+
 ui_makeCode();
 
 document.getElementById('text').addEventListener("blur", ui_makeCode);
@@ -613,9 +631,13 @@ document.getElementById('split_time').addEventListener("input", ui_makeCode);
 document.getElementById('iMask').addEventListener("input", ui_makeCode);
 document.getElementById('iMinVersion').addEventListener("input", ui_makeCode);
 document.getElementById('iMaxVersion').addEventListener("input", ui_makeCode);
-document.getElementById('szRenderer').addEventListener("input", ui_makeCode);
 document.getElementById('szWhiteColor').addEventListener("input", ui_makeCode);
 document.getElementById('szBlackColor').addEventListener("input", ui_makeCode);
+document.getElementById('szRenderer').addEventListener("input", function()
+  {
+    rendererDropdownChanged();
+    ui_makeCode();
+  });
 document.getElementById('buttomImageMode').addEventListener("click",function()
   {
     document.getElementById('tab1').style.display = "block";
