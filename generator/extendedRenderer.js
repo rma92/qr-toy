@@ -102,8 +102,10 @@ function renderQr_char(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillS
   {
     szCharList = document.getElementById("szRenderCharList").value;
   }
-  const aNonEmojis = szCharList.match(/[^\p{Emoji}]/gu);
-  const aEmojis = szCharList.match(/\p{Emoji}/gu);
+  var aNonEmojis = szCharList.match(/[^\p{Emoji}]/gu);
+  var aEmojis = szCharList.match(/\p{Emoji}/gu);
+  if( aNonEmojis == null ) aNonEmojis = [];
+  if( aEmojis == null ) aEmojis = [];
   var aCharList = aEmojis.concat(aNonEmojis);
   aCharList = aCharList.filter(item => item !== null);
   var szFontStyle = "serif"; 
