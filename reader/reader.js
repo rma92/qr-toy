@@ -15,16 +15,25 @@ var dScans = {};
  * knownCRCScans value is an array of the scans.
  * knownCRCFilename value is the file name if it was specified, otherwise <crc>.txt.
  * finishedFiles value is the concatenated values of the files once all parts have been scanned.
+ * finishedFilesArrayBuffer value is the files uncompressed (if needed) as an arraybuffer.
  */
 var knownCRCLength = {};
 var knownCRCScans = {};
 var knownCRCFilename = {};
 var knownCRCEncoding = {};
 var finishedFiles = {};
+var finishedFilesArrayBuffer = {};
 //caching of last scan info for viewer
 var szCachedLastScan = "";
 var iCachedLastScanID = 0;
 var szCachedLastScanCRC = "";
+//cached file data for debugging or log output
+var cachedOutString = "";
+var cachedB10Decode = "";
+var cachedLZMAOut = "";
+var cachedDecode = "";
+var cachedArrayBuffer = "";
+
 /*
  * Resets the stored data
  */
@@ -154,6 +163,68 @@ function processSingleScan(szScan)
       }
     }
 }
+
+/*
+ * gets the string value of Object.keys(dScans)[keyId]
+ *
+ * Used to get the contents of an array for save and view buttons for
+ * individual scans in the table.
+ *
+ * This sorts the keys.  Since processScanData is called and redraws
+ * the table when a new scan is added to dScans, the indexes here should
+ * be the same.
+ */
+function getScanContentsByKeyId(keyId)
+{
+  var keys = Object.keys( dScans );
+  keys = keys.sort();
+  return keys[keyId];
+}
+
+function downloadArrayBuffer(arrayBuffer, fileName) {
+    // Create a blob from the ArrayBuffer
+    const blob = new Blob([new Uint8Array(arrayBuffer)], { type: 'application/octet-stream' });
+
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a link element
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+
+    // Append the link to the document body and trigger the download
+    document.body.appendChild(a);
+    a.click();
+
+    // Remove the link from the document
+    document.body.removeChild(a);
+
+    // Revoke the object URL to free up memory
+    URL.revokeObjectURL(url);
+}
+
+/*
+ * Accepts an array buffer (e.g. from finishedFilesArrayBuffer[ keysFf[i] ]) and
+ * returns an image url.
+ */
+function arrayBufferToBlobUrl(arrayBuffer, mimeType) {
+    // Create a blob from the ArrayBuffer
+    const blob = new Blob([arrayBuffer], { type: mimeType });
+
+    // Create a URL for the blob
+    return URL.createObjectURL(blob);
+}
+
+function downloadContentByCrc(szCrc) {
+  var filename = "file.txt";
+  if( knownCRCFilename[ szCrc ] )
+  {
+    filename = knownCRCFilename[ szCrc ];
+  }
+  downloadArrayBuffer(finishedFilesArrayBuffer[szCrc], filename);
+}
+
 /*
  * Analyze the scanned data.
  */
@@ -163,16 +234,18 @@ function processScanData()
   var resultContainer = document.getElementById('qr-reader-results');
   processSingleScan(szCachedLastScan);
   keys = keys.sort();
-  resultContainer.innerHTML = "";
+  var szResultOut = "<table class=\"resultsTable\">";
   for(var i = 0; i < keys.length; ++i )
   {
-    resultContainer.innerHTML += keys[i] + "<br/>";
+    szResultOut += "<tr><td><div class=\"tdScanPreview\">" + keys[i].replaceAll("\n", "<br/>") + "</div></td>";
+    szResultOut += "<td><button onClick=\"makePopupOfString( getScanContentsByKeyId(" + i + ").replaceAll('\\n','<br/>') );\">View</button></td></tr>";
 
     //Sample string:
     //"Q:3:10:15748754::Four score seven years ago"
     //processSingleScan( keys[i] );
   }
-
+  szResultOut += "</table>";
+  resultContainer.innerHTML = szResultOut;
   //Create the table of CRCs
   var knownCRCKeys = Object.keys( knownCRCScans );
   var tableOut = "";
@@ -230,6 +303,47 @@ function processScanData()
         btoa(unescape(encodeURIComponent(outString ))) );
       }
       finishedFiles[ currentCrc ] = outString;
+      //parse the file.
+      //new TextDecoder("Latin1").decode( new Uint8Array( finishedFilesArrayBuffer[1021043213] ) );
+      if( knownCRCEncoding[ currentCrc ] == 'LB1' )
+      {
+        cachedOutString = outString;
+        cachedB10Decode = b10decode( outString );
+        cachedLZMAOut = LZMA.decompress( cachedB10Decode );
+        //cachedDecode = new TextDecoder("Latin1").decode( new Uint8Array( cachedLZMAOut ) );
+        //cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
+        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+      }
+      else if( knownCRCEncoding[ currentCrc ] == 'B10' )
+      {
+        finishedFilesArrayBuffer[ currentCrc ] = b10decode( outString );
+      }
+      else if( knownCRCEncoding[ currentCrc ] == 'LB6' )
+      {
+        const binaryString = atob(outString);
+        var bytes = new Uint8Array( binaryString.length );
+        for( let i = 0; i < binaryString.length; ++i )
+        {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        cachedLZMAOut = LZMA.decompress( bytes );
+        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+      }
+      else if( knownCRCEncoding[ currentCrc ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
+      {
+        const binaryString = atob(outString);
+        var bytes = new Uint8Array( binaryString.length );
+        for( let i = 0; i < binaryString.length; ++i )
+        {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        finishedFilesArrayBuffer[ currentCrc ] = bytes.buffer;
+      }
+      else
+      {
+        finishedFilesArrayBuffer[ currentCrc ] = outString;
+      } //if filetype
       update_file_download_links();
     }
   }
@@ -274,90 +388,57 @@ function getMimeType(extension) {
 /*
  * Call from processScanData when a new file is finished to update the links.
  */
-var cachedOutString = "";
-var cachedB10Decode = "";
-var cachedLZMAOut = "";
-var cachedDecode = "";
-var cachedArrayBuffer = "";
-
 function update_file_download_links()
 {
   var d = document.getElementById("file-links");
-  var keysFf = Object.keys( finishedFiles );
-  d.innerHTML = "<ul>";
+  var keysFf = Object.keys( finishedFilesArrayBuffer );
+  var szLinksTableOut = "<ul>";
   for( var i = 0; i < keysFf.length; ++i )
   {
-    var outString = finishedFiles[ keysFf[i]];
-    var b64Result = "";
     var filename = knownCRCFilename[ keysFf[i] ];
-    if( knownCRCEncoding[ keysFf[i] ] == 'LB1' )
-    {
-      cachedOutString = outString;
-      cachedB10Decode = b10decode( outString );
-      cachedLZMAOut = LZMA.decompress( cachedB10Decode );
-      cachedDecode = new TextDecoder("Latin1").decode( new Uint8Array( cachedLZMAOut ) );
-      cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
-      //cachedEncode = new TextEncoder("Latin1").encode( cachedLZMAOut );
-      b64Result = _arrayBufferToBase64( cachedArrayBuffer );      
-      if( bDebug )
-      {
-        console.log( cachedOutString )
-        console.log( cachedB10Decode );
-        console.log( cachedLZMAOut );
-        console.log( cachedDecode );
-        console.log( cachedArrayBuffer );
-        console.log( b64Result );
-      }
-
-    }
-    else if( knownCRCEncoding[ keysFf[i] ] == 'B10' )
-    {
-      var szStr = b10decode( outString );
-      b64Result = _arrayBufferToBase64( szStr );
-    }
-    else if( knownCRCEncoding[ keysFf[i] ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
-    {
-      b64Result = outString;
-      //Is Base64
-    }
-    else
-    {
-      b64Result = btoa(unescape(encodeURIComponent(outString ))) ;
-    }
-    d.innerHTML += "<li><a download=\""
+    szLinksTableOut += "<li><a download=\""
                 + filename
-                + "\" href=\""
-                + "data:text/plain;base64," + b64Result
+                + "\" onclick=\""
+                + "downloadContentByCrc(" + keysFf[i] + ")"
                 + "\">"
                 + filename
                 + "</a>"
-                + "(<a onclick=\""
+                + " (<a onclick=\""
                 + "makePopupOfCrc(" + keysFf[i]
-                + ")\")>Open</a>)"
+                + ")\")>Open As Text</a>)"
                 + "</li>\n";
     if( hasImageExtensionRegex( filename ) )
     {
-      const base64Data = b64Result;
       const extension = getFileExtension( filename );
       const mimeType = getMimeType(extension);
-      d.innerHTML += `<br/><img src="data:${mimeType};base64,${base64Data}" alt="${filename}" />`;
+      const blobUrl = arrayBufferToBlobUrl(new Uint8Array( finishedFilesArrayBuffer[ keysFf[i] ]), mimeType);
+      szLinksTableOut += `<br/><img src="${blobUrl}" alt="image" />`;
     }
   }
-  d.innerHTML += "</ul>";
+  szLinksTableOut += "</ul>";
+  d.innerHTML = szLinksTableOut;
 }
 
+/*
+ * Given a CRC, decodes as text and displays in the popup window using makePopupOfString.
+ */
 function makePopupOfCrc(szCrc)
 {
-  makePopupOfString("Not yet implemented.");
+    makePopupOfString( new TextDecoder("Latin1").decode( new Uint8Array( finishedFilesArrayBuffer[szCrc] ) ).replaceAll("\n", "<br/>") );
 }
 
+/*
+ * Given a string, generates a popup window of the viewer.
+ *
+ * TODO: expand the viewer to be mime aware and support other types of files.
+ */
 function makePopupOfString(szString)
 {
   const popupWindow = window.open("", "popupWindow", "width=600,height=400");
   popupWindow.document.innerHTML = "";
   pageid = 0;
-  // Write the random text to the new window
-  var iFontsize = "200px";
+
+  var iFontsize = "12px";
   popupWindow.document.write(`
       <!DOCTYPE html>
       <html lang="en">
@@ -371,13 +452,47 @@ function makePopupOfString(szString)
         </style>
        <title>Static Page</title>
       </head>
-      <body>`);
-    popupWindow.document.write(szString)
-    popupWindow.document.write(`
-    </body>
-    </html>
+      <body>
+      <table><tr><td>
+        <button onclick="window.close()">Close</button>
+        </td><td>
+        <button onclick="copyToClipboard()">Copy</button>        
+      </td>
+      <td>
+        <button onclick="downloadContent()">Download</button>      
+      </td>
+      </tr>
+      </table>
+      <div id="popupContent">
   `);
+    popupWindow.document.write(szString)
+    popupWindow.document.write(`</div></body>`);
+    popupWindow.document.write(`
+        <script>
+            function copyToClipboard() {
+                const content = document.getElementById('popupContent').innerText;
+                navigator.clipboard.writeText(content).then(() => {
+                    alert('Content copied to clipboard!');
+                }).catch(err => {
+                    alert('Failed to copy content: ' + err);
+                });
+            }
 
+            function downloadContent() {
+                const content = document.getElementById('popupContent').innerText;
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'content.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    `);
+    popupWindow.document.write(`</html>`);
 }
 /*
  * When the page is ready and interactive, scanning attempts start.
@@ -404,8 +519,8 @@ function runScanner()
     }
   }
 
-  var html5QrcodeScanner = new Html5QrcodeScanner(
-    "qr-reader", { fps: ifps, qrbox: iqrbox });
+  //var html5QrcodeScanner = new Html5QrcodeScanner( "qr-reader", { fps: ifps, qrbox: iqrbox });
+  var html5QrcodeScanner = new Html5QrcodeScanner( "qr-reader", { fps: ifps });
   html5QrcodeScanner.render(onScanSuccess);
 }
 

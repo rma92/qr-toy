@@ -492,7 +492,7 @@ function ui_loadFileToInput()
         )
         {
           document.getElementById("split_size").value = 410;
-          document.getElementById("eccLevel").value = 'M';
+          document.getElementById("eccLevel").value = 'L';
           document.getElementById("scale").value = 9;
         }
         encoded = _arrayBufferToBase64( fileContents );
