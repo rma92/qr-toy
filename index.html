@@ -5,8 +5,8 @@
   <body>
     <h1>QR Code File Copy</h1>
     <ul>
-      <li><a href=generator>Generator</a></li>
-      <li><a href=reader>Reader</a></li>
+      <li><b><a href=generator>Generator</a></b></li>
+      <li><b><a href=reader>Reader</a></b></li>
     </ul>
 
     <p>The QR Code File Copy generates a stream of QR codes containing segments of a file or other data.  The reader has an HTML5 scanner that uses a camera to continuously scan and store data.  Once all the pieces of a file are scanned, the segments are combined and the file can be saved.</p>
@@ -26,11 +26,18 @@
     <ul>
       <li><a href=https://huonw.github.io/blog/2024/03/qr-base10-base64/>10 > 64, in QR codes</a> By Huon Wilson — 31 Mar 2024 (accessed 17 Jan 2025</li>
       <li><a href=https://github.com/zxing-cpp/zxing-cpp>https://github.com/zxing-cpp/zxing-cpp</a> ZXing CPP, WebAssembly used in reader.</li>
+      <li><a href=https://github.com/kikuchan/libqrean>https://github.com/kikuchan/libqrean</a> Qrean - generates rMQR formats</a>
       <li><a href=https://github.com/mebjas/html5-qrcode>https://github.com/mebjas/html5-qrcode</a> HTML5 QRcode Reader (used for old reader)</li>
       <li><a href=https://www.nayuki.io/page/qr-code-generator-library>https://www.nayuki.io/page/qr-code-generator-library</a> Used for Javascript generator and modern C generator</li>
       <li><a href=https://github.com/ricmoo/QRCode>https://github.com/ricmoo/QRCode</a> Used for legacy C generator</li>
       <li><a href=https://davidshimjs.github.io/qrcodejs/>https://davidshimjs.github.io/qrcodejs/</a> Used to prototype JavaScript generator.</li>
       <li><a href=https://github.com/LZMA-JS/LZMA-JS>https://github.com/LZMA-JS/LZMA-JS</a> LZMA-JS - used with decompress modified not to convert to a string.</li> <!-- clone LZMA-JS, npm install uglify-js, remove decode function from lzma_worker, remove two calls to decode( and run node minify.js in the clone root.  Copy lzma_worker-min.js here-->
+    </ul>
+    <h2>Other Demos</h2>
+    <ul>
+      <li><a href=zxing_write_demo>ZXing Write</a></li>
+      <li><a href=zxing_read_demo>ZXing Read</a></li>
+      <li><a href=qrean-demo>Qrean</a> (Create and Scan)</li>
     </ul>
   </body>
 </html>
