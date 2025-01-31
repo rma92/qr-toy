@@ -2,7 +2,7 @@
 <html>
 
   <head>
-    <title>zxing-cpp/wasm live demo</title>
+    <title>HotQR scanner</title>
     <link rel="shortcut icon" href="#" />
     <!--<script src="zxing_reader.js"></script>-->
     <script src="lzma_worker-min.js"></script>
@@ -18,20 +18,16 @@
   </head>
 
   <body style="text-align: center">
-    <h2>zxing-cpp/wasm live demo</h2>
-    <p>
-    This is a simple demo of the wasm wrapper of <a href="https://github.com/zxing-cpp/zxing-cpp">zxing-cpp</a>
-    scanning for barcodes in a live video stream.
-    </p>
-
-    Camera:
+    <table><tr>
+        <td>
+          Camera:<br/>
     <select id="cameraSelector">
       <option value="user">Front Camera</option>
       <option value="environment">Back Camera</option>
     </select>
-    &nbsp;&nbsp;
-
-    Format:
+        </td>
+        <td>
+    Format:<br/>
     <select id="format">
       <option value="" selected="">Any</option>
       <option value="Aztec">Aztec</option>
@@ -56,15 +52,20 @@
       <option value="LinearCodes">Linear Codes</option>
       <option value="MatrixCodes">Matrix Codes</option>
     </select>
-    &nbsp;&nbsp;
-
-    Mode:
+        </td>
+        <td>
+          Mode:<br/>
     <select id="mode">
       <option value="true" selected="">Normal</option>
       <option value="false">Fast</option>
     </select>
+        </td>
+        <td>
+          Info:<br/>
           <input id="inputTextOut" />
-    
+        </td>
+      </tr>
+    </table>
     <br /><br />
 
     <canvas id="canvas" width="640" height="480"></canvas>
