@@ -37,6 +37,279 @@ var cachedFileContents = null;
 var cachedFileContentsRaw = null;
 
 /*
+ * Make segments optimally
+ */
+function makeSegmentsOptimally(text, ecl, minVersion, maxVersion) {
+  if (typeof text == 'string')
+  {
+    text = CodePoint.toArray(text);
+  }
+  if (!(0 <= ecl && ecl <= 3))
+    throw new RangeError("Invalid error correction level");
+  if (!(1 <= minVersion && minVersion <= maxVersion && maxVersion <= 40))
+    throw new RangeError("Invalid version range");
+  // Iterate through version numbers, and make tentative segments
+  let segs = []; // Dummy initial value
+  for (let version = minVersion; version <= maxVersion; version++) {
+    if (version == minVersion || version == 10 || version == 27)
+      segs = makeSegmentsOptimallyForVersion(text, version);
+    // Check if the segments fit
+    const dataCapacityBits = NUM_DATA_CODEWORDS[version][ecl] * 8;
+    const dataUsedBits = getTotalBits(segs, version);
+    if (dataUsedBits <= dataCapacityBits)
+      return [version, segs];
+  }
+  // The data is too long to fit in any QR Code symbol at any version in
+  // the range [minVersion, maxVersion] with ecl level error correction
+  return null;
+}
+// Returns a new array of segments that is optimal for the given text at the given version number.
+function makeSegmentsOptimallyForVersion(text, version) {
+  if (typeof text == 'string')
+  {
+    text = CodePoint.toArray(text);
+  }
+  if (text.length == 0)
+    return [];
+  const charModes = computeCharacterModes(text, version);
+  return splitIntoSegments(text, charModes);
+}
+// Returns a new array representing the optimal mode per code point based on the given text and version.
+function computeCharacterModes(text, version) {
+  if (text.length == 0)
+    throw new RangeError("Empty string");
+  const modeTypes = ["BYTE", "ALPHANUMERIC", "NUMERIC", "KANJI"];
+  // Segment header sizes, measured in 1/6 bits
+  const headCosts = modeTypes.map(mode => (4 + getNumCharCountBits(mode, version)) * 6);
+  // charModes[i][j] represents the mode to encode the code point at
+  // index i such that the final segment ends in modeTypes[j] and the
+  // total number of bits is minimized over all possible choices
+  let charModes = [];
+  // At the beginning of each iteration of the loop below,
+  // prevCosts[j] is the exact minimum number of 1/6 bits needed to
+  // encode the entire string prefix of length i, and end in modeTypes[j]
+  let prevCosts = headCosts.slice();
+  // Calculate costs using dynamic programming
+  for (const c of text) {
+    let cModes = modeTypes.map(_ => null);
+    let curCosts = modeTypes.map(_ => Infinity);
+    { // Always extend a byte mode segment
+      curCosts[0] = prevCosts[0] + c.utf8.length * 8 * 6;
+      cModes[0] = modeTypes[0];
+    }
+    // Extend a segment if possible
+    if (isAlphanumeric(c.utf32)) {
+      curCosts[1] = prevCosts[1] + 33; // 5.5 bits per alphanumeric char
+      cModes[1] = modeTypes[1];
+    }
+    if (isNumeric(c.utf32)) {
+      curCosts[2] = prevCosts[2] + 20; // 3.33 bits per digit
+      cModes[2] = modeTypes[2];
+    }
+    /*
+            if (isKanji(c.utf32)) {
+                curCosts[3] = prevCosts[3] + 78; // 13 bits per Shift JIS char
+                cModes[3] = modeTypes[3];
+            }
+            */
+    // Start new segment at the end to switch modes
+    modeTypes.forEach((_, j) => {
+      modeTypes.forEach((fromMode, k) => {
+        const newCost = Math.ceil(curCosts[k] / 6) * 6 + headCosts[j];
+        if (cModes[k] !== null && newCost < curCosts[j]) {
+          curCosts[j] = newCost;
+          cModes[j] = fromMode;
+        }
+      });
+    });
+    charModes.push(cModes);
+    prevCosts = curCosts;
+  }
+  // Find optimal ending mode
+  let curModeIndex = 0;
+  modeTypes.forEach((mode, i) => {
+    if (prevCosts[i] < prevCosts[curModeIndex])
+      curModeIndex = i;
+  });
+  // Get optimal mode for each code point by tracing backwards
+  let result = [];
+  for (let i = text.length - 1; i >= 0; i--) {
+    const curMode = charModes[i][curModeIndex];
+    curModeIndex = modeTypes.indexOf(curMode);
+    result.push(curMode);
+  }
+  result.reverse();
+  return result;
+}
+// Returns a new array of segments based on the given text and modes, such that
+// consecutive code points in the same mode are put into the same segment.
+function splitIntoSegments(text, charModes) {
+  if (text.length == 0)
+    throw new RangeError("Empty string");
+  if (text.length != charModes.length)
+    throw new RangeError("Mismatched lengths");
+  let result = [];
+  // Accumulate run of modes
+  let curMode = charModes[0];
+  let start = 0;
+  for (let i = 1;; i++) {
+    if (i < text.length && charModes[i] == curMode)
+      continue;
+    result.push(new Segment(text.slice(start, i), curMode));
+    if (i >= text.length)
+      return result;
+    curMode = charModes[i];
+    start = i;
+  }
+}
+class Segment {
+  constructor(text, mode) {
+    this.mode = mode;
+    this.text = text.map(c => c.utf16).join("");
+    if (mode == "BYTE") {
+      this.numChars = 0;
+      for (const c of text)
+        this.numChars += c.utf8.length;
+      this.numDataBits = this.numChars * 8;
+    }
+    else {
+      this.numChars = text.length;
+      switch (mode) {
+        case "NUMERIC":
+          this.numDataBits = Math.ceil(this.numChars * 10 / 3);
+          break;
+        case "ALPHANUMERIC":
+          this.numDataBits = Math.ceil(this.numChars * 11 / 2);
+          break;
+        case "KANJI":
+          this.numDataBits = this.numChars * 13;
+          break;
+        default:
+          throw new RangeError("Invalid mode");
+      }
+    }
+  }
+}
+// Calculates and returns the number of bits needed to encode the given segments at the given
+// version. The result is infinity if a segment has too many characters to fit its length field.
+function getTotalBits(segs, version) {
+  let result = 0;
+  for (const seg of segs) {
+    const ccbits = getNumCharCountBits(seg.mode, version);
+    if (seg.numChars >= (1 << ccbits))
+      return Infinity; // The segment's length doesn't fit the field's bit width
+    result += 4 + ccbits + seg.numDataBits;
+  }
+  return result;
+}
+/*---- Low-level computation functions ----*/
+// Returns the bit width of the character count field for a segment
+// in the given mode in a QR Code at the given version number.
+function getNumCharCountBits(mode, version) {
+  if (version < 1 || version > 40)
+    throw new RangeError("Invalid version");
+  return {
+    NUMERIC: [10, 12, 14],
+    ALPHANUMERIC: [9, 11, 13],
+    BYTE: [8, 16, 16],
+    KANJI: [8, 10, 12],
+  }[mode][Math.floor((version + 7) / 17)];
+}
+// NUM_DATA_CODEWORDS[v][e] is the number of 8-bit data codewords (excluding error correction codewords)
+// in a QR Code symbol at version v (from 1 to 40 inclusive) and error correction e (0=L, 1=M, 2=Q, 3=H).
+const NUM_DATA_CODEWORDS = [
+  //  L,    M,    Q,    H    // Error correction level
+  [-1, -1, -1, -1],
+  [19, 16, 13, 9],
+  [34, 28, 22, 16],
+  [55, 44, 34, 26],
+  [80, 64, 48, 36],
+  [108, 86, 62, 46],
+  [136, 108, 76, 60],
+  [156, 124, 88, 66],
+  [194, 154, 110, 86],
+  [232, 182, 132, 100],
+  [274, 216, 154, 122],
+  [324, 254, 180, 140],
+  [370, 290, 206, 158],
+  [428, 334, 244, 180],
+  [461, 365, 261, 197],
+  [523, 415, 295, 223],
+  [589, 453, 325, 253],
+  [647, 507, 367, 283],
+  [721, 563, 397, 313],
+  [795, 627, 445, 341],
+  [861, 669, 485, 385],
+  [932, 714, 512, 406],
+  [1006, 782, 568, 442],
+  [1094, 860, 614, 464],
+  [1174, 914, 664, 514],
+  [1276, 1000, 718, 538],
+  [1370, 1062, 754, 596],
+  [1468, 1128, 808, 628],
+  [1531, 1193, 871, 661],
+  [1631, 1267, 911, 701],
+  [1735, 1373, 985, 745],
+  [1843, 1455, 1033, 793],
+  [1955, 1541, 1115, 845],
+  [2071, 1631, 1171, 901],
+  [2191, 1725, 1231, 961],
+  [2306, 1812, 1286, 986],
+  [2434, 1914, 1354, 1054],
+  [2566, 1992, 1426, 1096],
+  [2702, 2102, 1502, 1142],
+  [2812, 2216, 1582, 1222],
+  [2956, 2334, 1666, 1276], // Version 40
+];
+// Tests whether the given code point can be encoded in numeric mode.
+function isNumeric(cp) {
+  return cp < 128 && "0123456789".includes(String.fromCodePoint(cp));
+}
+// Tests whether the given code point can be encoded in alphanumeric mode.
+function isAlphanumeric(cp) {
+  return cp < 128 && "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:".includes(String.fromCodePoint(cp));
+}
+/*---- Helper class ----*/
+class CodePoint {
+  constructor(utf32) {
+    this.utf32 = utf32;
+    this.utf16 = String.fromCodePoint(utf32);
+    if (utf32 < 0)
+      throw new RangeError("Invalid code point");
+    else if (utf32 < 0x80)
+      this.utf8 = [utf32];
+    else {
+      let n;
+      if (utf32 < 0x800)
+        n = 2;
+      else if (utf32 < 0x10000)
+        n = 3;
+      else if (utf32 < 0x110000)
+        n = 4;
+      else
+        throw new RangeError("Invalid code point");
+      this.utf8 = [];
+      for (let i = 0; i < n; i++, utf32 >>>= 6)
+        this.utf8.unshift(0x80 | (utf32 & 0x3F));
+      this.utf8[0] |= (0xF00 >>> n) & 0xFF;
+    }
+  }
+  static toArray(s) {
+    let result = [];
+    for (const ch of s) {
+      const cc = ch.codePointAt(0);
+      if (0xD800 <= cc && cc < 0xE000)
+        throw new RangeError("Invalid UTF-16 string");
+      result.push(new CodePoint(cc));
+    }
+    return result;
+  }
+}
+
+/*
+ * End Make Segments Optimally.
+ */
+/*
  * Given a string str, returns an array containing str split into multiple strings of length size (or less).
  */
 function stringChop (str, size)
@@ -180,6 +453,7 @@ function makeNextCode()
 } //makeNextCode()
 
 //helper function to split string into array.
+/*
 function splitStringByCategory(input, min_length) {
     const result = [];
     let current = '';
@@ -204,6 +478,7 @@ function splitStringByCategory(input, min_length) {
 
     return result;
 }
+*/
 
 /*
  * Render and return a qrcodegen.QrCode.
@@ -243,17 +518,28 @@ function generateQrFromSegs(aSegs, eccStr = 'L', minVersion = 1, maxVersion = 40
 function generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
 {
   var qr;
-  var strs = splitStringByCategory(qStr, 10);
+  var iEccLevel = 0;
+  if( eccStr == 'M' ) iEccLevel = 1;
+  else if( eccStr == 'Q' ) iEccLevel = 2;
+  else if( eccStr == 'H' ) iEccLevel = 3;
+
+  var xsegs = makeSegmentsOptimally(qStr, iEccLevel, minVersion, maxVersion);
+  var aSegList = xsegs[1];
+  if(bQrSplitterDebug) console.log(aSegList);
   var segs = [];  
-  for(var i = 0; i < strs.length; ++i )
+  for(var i = 0; i < aSegList.length; ++i )
   {
-    if( /[0-9]/.test( strs[i] ) )
+    if( aSegList[i].mode == "NUMERIC" )
     {
-      segs.push( qrcodegen.QrSegment.makeNumeric(strs[i]) );
+      segs.push( qrcodegen.QrSegment.makeNumeric(aSegList[i].text) );
+    }
+    else if(aSegList[i].mode == "ALPHANUMERIC")
+    {
+      segs.push( qrcodegen.QrSegment.makeAlphanumeric(aSegList[i].text) );
     }
     else
     {
-      segs.push( (qrcodegen.QrSegment.makeSegments(strs[i]))[0] );
+      segs.push( (qrcodegen.QrSegment.makeSegments(aSegList[i].text))[0] );      
     }
   }
   qr = generateQrFromSegs(segs, eccStr, minVersion, maxVersion, mask, boostEcl)
@@ -488,7 +774,9 @@ function ui_loadFileToInput()
       {
         //if the split_size is a default, change ui settings for splitter
         if( document.getElementById("split_size").value == 0
+        || document.getElementById("split_size").value == 410
         || document.getElementById("split_size").value == 1400
+        || document.getElementById("split_size").value == 1100
         )
         {
           document.getElementById("split_size").value = 410;
@@ -504,11 +792,23 @@ function ui_loadFileToInput()
         //if the split_size is a default, change ui settings for splitter
         if( document.getElementById("split_size").value == 0
         || document.getElementById("split_size").value == 410
+        || document.getElementById("split_size").value == 1100
+        || document.getElementById("split_size").value == 1400
         )
         {
-          document.getElementById("split_size").value = 1400;
-          document.getElementById("eccLevel").value = 'M';
-          document.getElementById("scale").value = 9;
+          console.log("A");
+          if( window.innerWidth < 500 )
+          { //Phone
+            document.getElementById("split_size").value = 1100;
+            document.getElementById("eccLevel").value = 'L';
+            document.getElementById("scale").value = 5;
+          }
+          else
+          {
+            document.getElementById("split_size").value = 1400;
+            document.getElementById("eccLevel").value = 'L';
+            document.getElementById("scale").value = 9;
+          }
         }
         encoded = b10encode( fileContents );
       }
