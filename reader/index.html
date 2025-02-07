@@ -21,44 +21,48 @@
     <table><tr>
         <td>
           Camera:<br/>
-    <select id="cameraSelector">
-      <option value="user">Front Camera</option>
-      <option value="environment">Back Camera</option>
-    </select>
+          <select id="cameraSelector">
+            <option value="user">Front Camera</option>
+            <option value="environment">Back Camera</option>
+          </select>
         </td>
         <td>
-    Format:<br/>
-    <select id="format">
-      <option value="" selected="">Any</option>
-      <option value="Aztec">Aztec</option>
-      <option value="Code39">Codabar</option>
-      <option value="CODE_39">Code39</option>
-      <option value="Code93">Code93</option>
-      <option value="Code128">Code128</option>
-      <option value="DataMatrix">DataMatrix</option>
-      <option value="DataBar">DataBar</option>
-      <option value="DataBarExpanded">DataBarExpanded</option>
-      <option value="DataBarLimited">DataBarLimited</option>
-      <option value="DXFilmEdge">DXFilmEdge</option>
-      <option value="EAN8">EAN-8</option>
-      <option value="EAN13">EAN-13</option>
-      <option value="ITF">ITF</option>
-      <option value="PDF417">PDF417</option>
-      <option value="QRCode">QRCode</option>
-      <option value="MicroQRCode">Micro QRCode</option>
-      <option value="RMQRCode">rMQR Code</option>
-      <option value="UPCA">UPC-A</option>
-      <option value="UPCE">UPC-E</option>
-      <option value="LinearCodes">Linear Codes</option>
-      <option value="MatrixCodes">Matrix Codes</option>
-    </select>
+          Format:<br/>
+          <select id="format">
+            <option value="" selected="">Any</option>
+            <option value="Aztec">Aztec</option>
+            <option value="Code39">Codabar</option>
+            <option value="CODE_39">Code39</option>
+            <option value="Code93">Code93</option>
+            <option value="Code128">Code128</option>
+            <option value="DataMatrix">DataMatrix</option>
+            <option value="DataBar">DataBar</option>
+            <option value="DataBarExpanded">DataBarExpanded</option>
+            <option value="DataBarLimited">DataBarLimited</option>
+            <option value="DXFilmEdge">DXFilmEdge</option>
+            <option value="EAN8">EAN-8</option>
+            <option value="EAN13">EAN-13</option>
+            <option value="ITF">ITF</option>
+            <option value="PDF417">PDF417</option>
+            <option value="QRCode">QRCode</option>
+            <option value="MicroQRCode">Micro QRCode</option>
+            <option value="RMQRCode">rMQR Code</option>
+            <option value="UPCA">UPC-A</option>
+            <option value="UPCE">UPC-E</option>
+            <option value="LinearCodes">Linear Codes</option>
+            <option value="MatrixCodes">Matrix Codes</option>
+          </select>
         </td>
         <td>
           Mode:<br/>
-    <select id="mode">
-      <option value="true" selected="">Normal</option>
-      <option value="false">Fast</option>
-    </select>
+          <select id="mode">
+            <option value="true" selected="">Normal</option>
+            <option value="false">Fast</option>
+          </select>
+        </td>
+        <td>
+          Focus:<br />
+          <input id="focusControl" type="range" min="0" max="100" value="50" />
         </td>
         <td>
           Info:<br/>
@@ -83,6 +87,7 @@
       });
 
       const cameraSelector = document.getElementById("cameraSelector");
+      const focusControl = document.getElementById("focusControl");      
       const format = document.getElementById("format");
       const mode = document.getElementById("mode");
       const canvas = document.getElementById("canvas");
@@ -90,10 +95,14 @@
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const video = document.createElement("video");
+      //var track;
+
       video.setAttribute("id", "video");
       video.setAttribute("width", canvas.width);
       video.setAttribute("height", canvas.height);
       video.setAttribute("autoplay", "");
+
+      let stream;
 
       function readBarcodeFromCanvas(canvas, format, mode) {
         var imgWidth = canvas.width;
@@ -156,21 +165,40 @@
         requestAnimationFrame(processFrame);
       };
 
-      const updateVideoStream = function (deviceId) {
+
+      const updateVideoStream = async function (deviceId) {
         // To ensure the camera switch, it is advisable to free up the media resources
         if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
 
-        navigator.mediaDevices
-          .getUserMedia({ video: { facingMode: deviceId }, audio: false })
-          .then(function (stream) {
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
-            video.play();
-            processFrame();
-          })
-          .catch(function (error) {
-            console.error("Error accessing camera:", error);
-          });
+        const constraints = {
+          video: {
+            facingMode: cameraSelector.value,
+          },
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+
+        //check if focus control is supported
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+        if (capabilities.focusDistance) {
+          focusControl.disabled = false;
+          focusControl.min = capabilities.focusDistance.min;
+          focusControl.max = capabilities.focusDistance.max;
+          focusControl.step = capabilities.focusDistance.step || 1;
+
+          // Set initial focus
+          updateFocus(focusControl.value);
+        } else {
+          focusControl.disabled = true;
+          console.warn("Focus control is not supported on this device.");
+        }
+        //end focus
+        video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
+        video.play();
+        processFrame();
+
       };
 
       cameraSelector.addEventListener("change", function () {
@@ -178,6 +206,17 @@
       });
 
       updateVideoStream();
+
+      /*
+        Update foucs, called when the focus slider moves.
+      */
+      function updateFocus(value) {
+        const track = stream.getVideoTracks()[0];
+        console.log(track);
+        track.applyConstraints({
+          advanced: [{ focusDistance: value }],
+        });
+      }
     </script>
   </body>
 
