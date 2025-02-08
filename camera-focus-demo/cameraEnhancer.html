@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Focus Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0" />
+  <script src="https://cdn.jsdelivr.net/npm/dynamsoft-core@3.2.10/dist/core.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dynamsoft-camera-enhancer@4.0.2/dist/dce.js"></script>
+  <style>
+    #enhancerUIContainer {
+      height: 480px;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h2>Camera Focus Demo</h2>
+  <label>
+    Camera:
+    <select id="select-camera"></select>
+  </label>
+  <label>
+    Resolution:
+    <select id="select-resolution">
+      <option value="640x480">640x480</option>
+      <option value="1280x720">1280x720</option>
+      <option value="1920x1080" selected>1920x1080</option>
+      <option value="3840x2160">3840x2160</option>
+    </select>
+  </label>
+  <label>
+    Mode:
+    <select id="select-mode">
+      <option value="manual" selected>manual</option>
+      <option value="continuous">continuous</option>
+    </select>
+  </label>
+  <button onclick="startCamera();">Start Camera</button>
+  <br/>
+  <div id="enhancerUIContainer"></div>
+  <script type="text/javascript">
+    let cameras = [];
+    let track;
+    let cameraEnhancer;
+    let cameraView;
+    let drawingLayer;
+    window.onload = async function(){
+      checkBrowserCapabilities();
+      await initDCE();
+      await listCameras();
+      registerEvents();
+    }
+
+    async function initDCE(){
+      cameraView = await Dynamsoft.DCE.CameraView.createInstance();
+      cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(cameraView);
+      drawingLayer = cameraView.createDrawingLayer();
+      document.querySelector("#enhancerUIContainer").append(cameraView.getUIElement());
+    }
+
+    async function listCameras(){
+      let cameraSelect = document.getElementById("select-camera");
+      cameras = await cameraEnhancer.getAllCameras();
+      for (let i = 0; i < cameras.length; i++){
+        let camera = cameras[i];
+        cameraSelect.appendChild(new Option(camera.label,camera.deviceId));
+      }
+    }
+    
+    async function startCamera(){
+      let selectedCamera = cameras[document.getElementById("select-camera").selectedIndex];
+      let selectedResolution = document.getElementById("select-resolution").selectedOptions[0].value;
+      let width = parseInt(selectedResolution.split("x")[0]);
+      let height = parseInt(selectedResolution.split("x")[1]);
+      await cameraEnhancer.selectCamera(selectedCamera);
+      await cameraEnhancer.setResolution({width:width, height:height});
+      await cameraEnhancer.open();
+      checkCameraCapabilities();
+    }
+
+    function registerEvents(){
+      console.log("registerEvents");
+      let container = document.getElementById("enhancerUIContainer");
+      container.addEventListener("click",function(e){
+        let {offsetX,offsetY} = calculateOffset();
+        let x = (e.offsetX - offsetX)/(container.offsetWidth - offsetX * 2);
+        let y = (e.offsetY - offsetY)/(container.offsetHeight - offsetY * 2);
+        focus(x,y);
+      })
+    }
+
+    function focus(x,y){
+      let video = cameraView.getVideoElement();
+      x = video.videoWidth * x;
+      y = video.videoHeight * y;
+      let drawingItems = new Array(
+        new Dynamsoft.DCE.RectDrawingItem({
+            x: x-25,
+            y: y-25,
+            width: 50,
+            height: 50,
+            isMeasuredInPercentage: false
+        }));
+      drawingLayer.addDrawingItems(drawingItems);
+      let mode = document.getElementById("select-mode").selectedOptions[0].value;
+      cameraEnhancer.setFocus({
+          mode: mode,
+          area: {
+            centerPoint: {
+                x: (x-25) + "px",
+                y: (y-25) + "px",
+            }
+          }
+      });
+      setTimeout(function(){
+        drawingLayer.clearDrawingItems();
+      },2000)
+    }
+
+    function calculateOffset(){
+      let containerWidth = document.getElementById("enhancerUIContainer").offsetWidth;
+      let containerHeight = document.getElementById("enhancerUIContainer").offsetHeight;
+      let video = cameraView.getVideoElement();
+      let videoWidth = video.videoWidth;
+      let videoHeight = video.videoHeight;
+      let containerRatio = containerWidth/containerHeight;
+      let videoRatio = videoWidth/videoHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+      if (containerRatio > videoRatio) { //has offset in horizontal direction
+        let displayRatio = containerHeight/videoHeight;
+        let displayWidth = displayRatio * videoWidth;
+        offsetX = (containerWidth - displayWidth) /2
+      }else{  //has offset in vertical direction
+        let displayRatio = containerWidth/videoWidth;
+        let displayHeight = displayRatio * videoHeight;
+        offsetY = (containerHeight - displayHeight) /2
+      }
+      return {offsetX:offsetX, offsetY:offsetY};
+    }
+
+    function checkBrowserCapabilities(){
+      if (navigator.mediaDevices.getSupportedConstraints().focusMode) {
+        console.log("The browser supports focus");
+      }else{
+        alert("The browser does not support focus.");
+      }
+    }
+
+    function checkCameraCapabilities(){
+      const video = cameraView.getVideoElement();
+      const videoTracks = video.srcObject.getVideoTracks();
+      track = videoTracks[0];
+      let capabilities = track.getCapabilities();
+      console.log(capabilities);
+      if (!('focusMode' in capabilities)) {
+        alert("This camera does not support focus");
+      }
+    }
+  </script>
+</body>
+</html>

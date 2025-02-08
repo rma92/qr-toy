@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Focus Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0" />
+  <style>
+    #container {
+      height: 480px;
+      width: 100%;
+      background: lightgray;
+      position: relative;
+    }
+
+    video {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+      left:0;
+      top:0;
+      object-fit: contain;
+    }
+       
+    button {
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h2>Camera Focus Demo</h2>
+  <label>
+    Camera:
+    <select id="select-camera"></select>
+  </label>
+  <label>
+    Resolution:
+    <select id="select-resolution">
+      <option value="640x480">640x480</option>
+      <option value="1280x720">1280x720</option>
+      <option value="1920x1080" selected>1920x1080</option>
+      <option value="3840x2160">3840x2160</option>
+    </select>
+  </label>
+  <button onclick="startCamera();">Start Camera</button>
+  <br/>
+  <div id="container">
+    <video id="video" muted autoplay="autoplay" playsinline="playsinline" webkit-playsinline></video>
+  </div>
+  <script type="text/javascript" src="index.js">
+  </script>
+  <a href="https://www.dynamsoft.com/codepool/camera-focus-control-on-web.html">https://www.dynamsoft.com/codepool/camera-focus-control-on-web.html</a>
+</body>
+</html>
