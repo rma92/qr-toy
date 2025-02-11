@@ -373,13 +373,85 @@ function isControlItem(x, y, width) {
         return (x === 6 || y === 6) && !isFinderPattern(x, y);
     }
 
-    // Function to check if a coordinate is within the alignment pattern
-    function isAlignmentPattern(x, y) {
-        // Assuming a single alignment pattern for simplicity, located at (width - 9, width - 9)
-        return x >= width - 9 && x < width - 3 && y >= width - 9 && y < width - 3;
+    const alignmentPatternLocations = {
+        2: [6, 18],
+        3: [6, 22],
+        4: [6, 26],
+        5: [6, 30],
+        6: [6, 34],
+        7: [6, 22, 38],
+        8: [6, 24, 42],
+        9: [6, 26, 46],
+        10: [6, 28, 50],
+        11: [6, 30, 54],
+        12: [6, 32, 58],
+        13: [6, 34, 62],
+        14: [6, 26, 46, 66],
+        15: [6, 26, 48, 70],
+        16: [6, 26, 50, 74],
+        17: [6, 30, 54, 78],
+        18: [6, 30, 56, 82],
+        19: [6, 30, 58, 86],
+        20: [6, 34, 62, 90],
+        21: [6, 28, 50, 72, 94],
+        22: [6, 26, 50, 74, 98],
+        23: [6, 30, 54, 78, 102],
+        24: [6, 28, 54, 80, 106],
+        25: [6, 32, 58, 84, 110],
+        26: [6, 30, 58, 86, 114],
+        27: [6, 34, 62, 90, 118],
+        28: [6, 26, 50, 74, 98, 122],
+        29: [6, 30, 54, 78, 102, 126],
+        30: [6, 26, 52, 78, 104, 130],
+        31: [6, 30, 56, 82, 108, 134],
+        32: [6, 34, 60, 86, 112, 138],
+        33: [6, 30, 58, 86, 114, 142],
+        34: [6, 34, 62, 90, 118, 146],
+        35: [6, 30, 54, 78, 102, 126, 150],
+        36: [6, 24, 50, 76, 102, 128, 154],
+        37: [6, 28, 54, 80, 106, 132, 158],
+        38: [6, 32, 58, 84, 110, 136, 162],
+        39: [6, 26, 54, 82, 110, 138, 166],
+        40: [6, 30, 58, 86, 114, 142, 170]
+    };
+    // Function to get alignment pattern locations based on QR code width
+    function getAlignmentPatternLocations(width) {
+        const version = (width - 17) / 4;
+        return alignmentPatternLocations[Math.floor(version)] || [];
     }
 
-    return isFinderPattern(x, y) || isTimingPattern(x, y) || isAlignmentPattern(x, y);
+    // Function to check if a coordinate is within any alignment pattern
+    function isAlignmentPattern(x, y, width, onlyOneLocator = false) {
+      const centers = getAlignmentPatternLocations(width);
+      if(  (x < 10 && y < 10)
+        || (x < 10 && y > width - 10)
+        || (x > width - 10 && y < 10 )
+
+      )
+      {
+      console.log( x, y );
+        
+        return false;
+      }
+      if( onlyOneLocator )
+      {
+        return x >= width - 9 && x < width - 4 && y >= width - 9 && y < width - 4;
+      }
+      else
+      {
+        for (let cx of centers) {
+            for (let cy of centers) {
+                if (Math.abs(x - cx) <= 2 && Math.abs(y - cy) <= 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+      }
+    }
+
+    var singleAlignment = document.getElementById('halftoneSingleAlignment').checked;    
+    return isFinderPattern(x, y) || isTimingPattern(x, y) || isAlignmentPattern(x, y, width, singleAlignment);
 }
 
     function drawImage() {
@@ -569,6 +641,10 @@ function rendererDropdownChangedEx(szRenderer, domidControlsOut)
         ModuleSize Override (-1 = default):<br/>
         <input type="number" id="halftoneQRsize" value="-1" min="-1" max="1000"/>
         </td>
+        <td>
+        Single Alignment:
+        <input id="halftoneSingleAlignment" type="checkbox">
+        </td>
         </tr>
         <tr>
         <td>
@@ -601,6 +677,7 @@ function rendererDropdownChangedEx(szRenderer, domidControlsOut)
     document.getElementById('scale').value = 6;
     document.getElementById('iMinVersion').value = 6;
     document.getElementById('halftoneQRsize').addEventListener("input", ui_makeCode);
+    document.getElementById('halftoneSingleAlignment').addEventListener("input", ui_makeCode);
   }
 }
 addRendererToDropdown("pokeball", "Pokeball");
