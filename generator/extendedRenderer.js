@@ -1,5 +1,10 @@
 //Hot QR extended rendering - additional drawing functionality
 //Begin general drawing functions
+let halftoneBgImage;
+let halftoneLastSizeUsed = 0;
+//var halftoneiPixelSize = 6;
+//var halftoneiBlockSize = (3 * halftoneiPixelSize);
+
 function roundBall(ctx2, x, y, iScale, lineWidth)
 {
   ctx2.strokeStyle = "black";
@@ -250,6 +255,204 @@ function renderQr_pokeball(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", f
   }
 }//renderQr_pokeball
 
+function renderQr_halftone(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
+{
+  //get the radius.
+  var fRadiusIntX = scale/4;
+  var fRadiusIntY = scale/4;
+  if( document.getElementById('halftoneQRsize').value != -1 )
+  {
+    fRadiusIntX = document.getElementById('halftoneQRsize').value;
+    fRadiusIntY = document.getElementById('halftoneQRsize').value;
+  }
+  var qrCodeSize = (qr.modules.length)* scale;
+
+  var offsetX = 10;
+  var offsetY = 10;
+
+  dCanvas.width = qrCodeSize + offsetX * 2;
+  dCanvas.height = qrCodeSize + offsetY * 2;
+  var ctx = dCanvas.getContext('2d');
+  ctx.clearRect(0,0, dCanvas.width, dCanvas.height);
+  ctx.fillStyle = backgroundStyle;
+  ctx.fillRect(0,0, dCanvas.width, dCanvas.height);
+  if( halftoneBgImage != null )
+  {
+    //Resize the canvases, and redraw the image.
+    if( halftoneLastSizeUsed != qr.modules.length * 3 * scale )
+    {
+      console.log("Halftone Background Resize");
+      $('#imageColour, #imageThreshold, #imagePixel').attr({
+        width: qr.modules.length * 3 * scale,
+        height: qr.modules.length * 3 * scale
+      });
+      
+      drawImage();
+    }
+    var canvasThreshold = $('#imageThreshold').get(0);
+    var ctxThreshold = canvasThreshold.getContext('2d');
+    ctx.drawImage(canvasThreshold, 0, 0, dCanvas.width, dCanvas.height);
+    //ctx.drawImage(halftoneBgImage, 0, 0, dCanvas.width, dCanvas.height);
+  }
+  var iModuleSizeOverride = document.getElementById('halftoneQRsize').value;
+  for(var y = 0; y < qr.modules.length; ++y )
+  {
+    for(var x = 0; x < qr.modules[y].length; ++x )
+    {
+      //Draw random bytes from halftone gen
+      //Function to draw random colors
+      //pixelSize = scale/2;
+      //blockSize = 3 * pixelSize;
+      //ctx.fillStyle = `rgb(${128 + Math.floor(Math.random() * 128)}, ${128 + Math.floor(Math.random() * 128)}, ${128 + Math.floor(Math.random() * 128)})`;
+      //ctx.fillRect( x * scale + offsetX , y * scale + offsetY, scale, scale );
+      /*
+      //Function to generate random noise.
+      for (var subRow = 0; subRow < 3; subRow++)
+      {
+        for (var subCell = 0; subCell < 3; subCell++)
+        {
+          //ctx.fillStyle = `rgb(${128 + Math.floor(Math.random() * 128)}, ${128 + Math.floor(Math.random() * 128)}, ${128 + Math.floor(Math.random() * 128)})`;
+          ctx.fillStyle = '#0000050';
+          if (Math.random() < 0.5) {
+            ctx.fillStyle = '#ffffff50';
+          }
+          ctx.fillRect( x * scale + offsetX + (subRow * scale / 3) , y * scale + offsetY + (subCell * scale / 3), scale / 3, scale / 3);
+
+        }
+      }
+      */
+      //end draw random bytes.
+      if( isControlItem(x, y, qr.modules.length ) )
+      {
+        ctx.fillStyle = (qr.modules[y][x])?fillStyleBlack:fillStyleWhite;
+        
+        ctx.fillRect( x * scale + offsetX , y * scale + offsetY, scale, scale );
+      }
+      else
+      {
+        ctx.fillStyle = (qr.modules[y][x])?fillStyleBlack:fillStyleWhite;
+        if( iModuleSizeOverride != -1 )
+        {
+          ctx.fillRect( 
+            x * scale + offsetX + Math.floor(scale / 2) - iModuleSizeOverride / 2, y * scale + offsetY + Math.floor(scale / 2) - iModuleSizeOverride / 2,
+            iModuleSizeOverride, iModuleSizeOverride);
+        }
+        else
+        {
+          ctx.fillRect( x * scale + offsetX + scale / 3, y * scale + offsetY + scale / 3, scale / 3, scale / 3);
+          //ctx.fillRect( x * scale + offsetX + scale / 3 - 1, y * scale + offsetY + scale / 3 - 1, scale / 3 + 2, scale / 3 + 2);
+        }
+      }
+      /*
+      //Circles, TODO make optionally available
+      ctx.beginPath();      
+      ctx.ellipse(x*scale+offsetX + scale /2 , y*scale+offsetY + scale / 2, fRadiusIntX, fRadiusIntY, 0, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = fillStyleBlack;
+      ctx.strokeStyle = fillStyleBlack;
+      ctx.beginPath();      
+      ctx.ellipse(x*scale+offsetX + scale /2 , y*scale+offsetY + scale / 2, fRadiusIntX, fRadiusIntY, 0, 0, 2 * Math.PI);
+      ctx.closePath();
+      ctx.stroke();
+      */
+    }
+  }
+}//renderQr_halftone
+
+//Halftone Helper functions
+function isControlItem(x, y, width) {
+    // Function to check if a coordinate is within a finder pattern
+    function isFinderPattern(x, y) {
+        //return (x < 7 && y < 7) || (x < 7 && y >= width - 7) || (x >= width - 7 && y < 7);
+        return (x < 8 && y < 8) || (x < 8 && y >= width - 8) || (x >= width - 8 && y < 8);
+    }
+
+    // Function to check if a coordinate is within the timing pattern
+    function isTimingPattern(x, y) {
+        return (x === 6 || y === 6) && !isFinderPattern(x, y);
+    }
+
+    // Function to check if a coordinate is within the alignment pattern
+    function isAlignmentPattern(x, y) {
+        // Assuming a single alignment pattern for simplicity, located at (width - 9, width - 9)
+        return x >= width - 9 && x < width - 3 && y >= width - 9 && y < width - 3;
+    }
+
+    return isFinderPattern(x, y) || isTimingPattern(x, y) || isAlignmentPattern(x, y);
+}
+
+    function drawImage() {
+        var canvasColour = $('#imageColour').get(0);
+        var ctxColour = canvasColour.getContext('2d');
+
+        ctxColour.clearRect(0, 0, canvasColour.width, canvasColour.height);
+        ctxColour.drawImage(halftoneBgImage, 0, 0, canvasColour.width, canvasColour.height);
+
+        drawPixel();
+    }
+
+    function drawPixel() {
+        var canvasColour = $('#imageColour').get(0);
+        var canvasPixel = $('#imagePixel').get(0);
+        var ctxPixel = canvasPixel.getContext('2d');
+        var canvasTemp = document.createElement('canvas');
+        canvasTemp.width = canvasTemp.height = (canvasPixel.width / parseInt(document.getElementById("scale").value / 2));
+        //console.log("drawPixel Width: " + canvasTemp.width );
+        var ctxTemp = canvasTemp.getContext('2d');
+
+        ctxPixel.imageSmoothingEnabled = false;
+        ctxTemp.imageSmoothingEnabled = false;
+
+        ctxTemp.drawImage(canvasColour, 0, 0, canvasTemp.width, canvasTemp.height);
+        ctxPixel.drawImage(canvasTemp, 0, 0, canvasPixel.width, canvasPixel.height);
+
+        drawThreshold();
+    }
+
+    function drawThreshold() {
+        var canvasPixel = $('#imagePixel').get(0);
+        var ctxPixel = canvasPixel.getContext('2d');
+        var canvasThreshold = $('#imageThreshold').get(0);
+        var ctxThreshold = canvasThreshold.getContext('2d');
+
+        var pixels = ctxPixel.getImageData(0, 0, canvasPixel.width, canvasPixel.height);
+        var d = pixels.data;
+        var width = Math.sqrt(d.length / 4) / parseInt(document.getElementById("scale").value);
+        for (var i = 0; i < d.length; i += 4) {
+            var r = d[i];
+            var g = d[i + 1];
+            var b = d[i + 2];
+            var grey = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+            //var v = (grey >= 127) ? 255 : 0;
+            //d[i] = d[i+1] = d[i+2] = v;
+            d[i] = d[i + 1] = d[i + 2] = grey;
+        }
+
+        for (var i = 0; i < d.length; i += 4) {
+            var grey = d[i];
+            var v = (grey >= 127) ? 255 : 0;
+
+            // Dithering
+            var error = (grey - v) / 8;
+            var i2 = i / 4;
+            var row = Math.floor(i2 / width);
+            var cell = i2 % width;
+
+            d[i] = d[i + 1] = d[i + 2] = v;
+
+            d[(((row + 0) * width) + (cell + 1)) * 4] = d[(((row + 0) * width) + (cell + 1)) * 4 + 1] = d[(((row + 0) * width) + (cell + 1)) * 4 + 2] = d[(((row + 0) * width) + (cell + 1)) * 4] + error;
+            d[(((row + 0) * width) + (cell + 2)) * 4] = d[(((row + 0) * width) + (cell + 2)) * 4 + 1] = d[(((row + 0) * width) + (cell + 2)) * 4 + 2] = d[(((row + 0) * width) + (cell + 2)) * 4] + error;
+            d[(((row + 1) * width) + (cell - 1)) * 4] = d[(((row + 1) * width) + (cell - 1)) * 4 + 1] = d[(((row + 1) * width) + (cell - 1)) * 4 + 2] = d[(((row + 1) * width) + (cell - 1)) * 4] + error;
+            d[(((row + 1) * width) + (cell + 0)) * 4] = d[(((row + 1) * width) + (cell + 0)) * 4 + 1] = d[(((row + 1) * width) + (cell + 0)) * 4 + 2] = d[(((row + 1) * width) + (cell + 0)) * 4] + error;
+            d[(((row + 1) * width) + (cell + 1)) * 4] = d[(((row + 1) * width) + (cell + 1)) * 4 + 1] = d[(((row + 1) * width) + (cell + 1)) * 4 + 2] = d[(((row + 1) * width) + (cell + 1)) * 4] + error;
+            d[(((row + 2) * width) + (cell + 0)) * 4] = d[(((row + 2) * width) + (cell + 0)) * 4 + 1] = d[(((row + 2) * width) + (cell + 0)) * 4 + 2] = d[(((row + 2) * width) + (cell + 0)) * 4] + error;
+        }
+        ctxThreshold.putImageData(pixels, 0, 0);
+      halftoneLastSizeUsed = canvasPixel.width;
+    }
+
+//End Halftone helper functions
 /*
  * Additional renderer function that is attempted to be called if render is set to something other than the builtins.
  */
@@ -262,6 +465,10 @@ function renderQr_Extended(renderer, dCanvas, qr, scale = 2, fillStyleWhite = "#
   else if( renderer == "char" )
   {
     renderQr_char(dCanvas, qr, scale, fillStyleWhite, fillStyleBlack, backgroundStyle);
+  }
+  else if( renderer == "halftone" )
+  {
+    renderQr_halftone(dCanvas, qr, scale, fillStyleWhite, fillStyleBlack, backgroundStyle);
   }
   else
   {
@@ -282,7 +489,7 @@ function rendererDropdownChangedEx(szRenderer, domidControlsOut)
   }
   if( szRenderer == "pokeball" )
   {
-    domObj.innerHTML += `
+    domObj.innerHTML = `
         <table>
         <tr>
         <td>
@@ -327,7 +534,7 @@ function rendererDropdownChangedEx(szRenderer, domidControlsOut)
   }//szRenderer == "pokeball"
   else if( szRenderer == "char" )
   {
-    domObj.innerHTML += `
+    domObj.innerHTML = `
         <table>
         <tr>
         <td>
@@ -348,7 +555,55 @@ function rendererDropdownChangedEx(szRenderer, domidControlsOut)
     document.getElementById('iCharFontSize').addEventListener("input", ui_makeCode);
     document.getElementById('szCharFontStyle').addEventListener("input", ui_makeCode);
   }
+  else if( szRenderer == "halftone" )
+  {
+    domObj.innerHTML = `
+        <table>
+        <tr>
+        <td>
+        Background:<br/>
+        <label for="halftoneInputImage" class="form-label"><strong>Image</strong></label>
+        <input id="halftoneInputImage" class="form-control" type="file" accept="image/*" onchange="handleHalftoneBgUpload(this)" />
+        </td>
+        <td>
+        ModuleSize Override (-1 = default):<br/>
+        <input type="number" id="halftoneQRsize" value="-1" min="-1" max="1000"/>
+        </td>
+        </tr>
+        <tr>
+        <td>
+        <div style="display: none">
+        <div class="col"><canvas id="imageColour" class="img-thumbnail"></canvas></div>
+        <div class="col"><canvas id="imagePixel" class="img-thumbnail"></canvas></div>
+        <div class="col"><canvas id="imageThreshold" class="img-thumbnail"></canvas></div>
+        </div>
+        </td>
+        </tr>
+        </table>`
+
+    window.handleHalftoneBgUpload = (e) => {
+        const file = e.files[0];
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            var imageColour = new Image();
+            imageColour.onload = function () {
+                has_image = true;
+                halftoneBgImage = this;
+                drawImage();
+                //regen();
+                ui_makeCode();
+            }
+            imageColour.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+        return false;
+    }
+    document.getElementById('scale').value = 6;
+    document.getElementById('iMinVersion').value = 6;
+    document.getElementById('halftoneQRsize').addEventListener("input", ui_makeCode);
+  }
 }
 addRendererToDropdown("pokeball", "Pokeball");
 addRendererToDropdown("char", "RandomChar");
+addRendererToDropdown("halftone", "halftone");
 //TODO: Write a function to run when the renderer dropdown changes to add controls to the table if needed for the specific renderer.

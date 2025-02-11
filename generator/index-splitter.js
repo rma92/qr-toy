@@ -519,28 +519,37 @@ function generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = 
 {
   var qr;
   var iEccLevel = 0;
+  var segs = [];
   if( eccStr == 'M' ) iEccLevel = 1;
   else if( eccStr == 'Q' ) iEccLevel = 2;
   else if( eccStr == 'H' ) iEccLevel = 3;
 
-  var xsegs = makeSegmentsOptimally(qStr, iEccLevel, minVersion, maxVersion);
-  var aSegList = xsegs[1];
-  if(bQrSplitterDebug) console.log(aSegList);
-  var segs = [];  
-  for(var i = 0; i < aSegList.length; ++i )
+  try
   {
-    if( aSegList[i].mode == "NUMERIC" )
+    var xsegs = makeSegmentsOptimally(qStr, iEccLevel, minVersion, maxVersion);
+    var aSegList = xsegs[1];
+    if(bQrSplitterDebug) console.log(aSegList);
+    for(var i = 0; i < aSegList.length; ++i )
     {
-      segs.push( qrcodegen.QrSegment.makeNumeric(aSegList[i].text) );
+      if( aSegList[i].mode == "NUMERIC" )
+      {
+        segs.push( qrcodegen.QrSegment.makeNumeric(aSegList[i].text) );
+      }
+      else if(aSegList[i].mode == "ALPHANUMERIC")
+      {
+        segs.push( qrcodegen.QrSegment.makeAlphanumeric(aSegList[i].text) );
+      }
+      else
+      {
+        segs.push( (qrcodegen.QrSegment.makeSegments(aSegList[i].text))[0] );      
+      }
     }
-    else if(aSegList[i].mode == "ALPHANUMERIC")
-    {
-      segs.push( qrcodegen.QrSegment.makeAlphanumeric(aSegList[i].text) );
-    }
-    else
-    {
-      segs.push( (qrcodegen.QrSegment.makeSegments(aSegList[i].text))[0] );      
-    }
+    //console.log(segs);
+  }
+  catch(ex)
+  {
+    console.log("Error optimizing segments in QR - the code is probably too large:" + ex);
+    segs.push( (qrcodegen.QrSegment.makeSegments(qStr))[0] );      
   }
   qr = generateQrFromSegs(segs, eccStr, minVersion, maxVersion, mask, boostEcl)
   return qr;
