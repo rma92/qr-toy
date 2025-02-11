@@ -10,7 +10,7 @@ $(function () {
 
         var canvas = $('#output').get(0);
         canvas.width = canvas.height = QRBytes.length * (3 * pixelSize);
-      console.log( "WIDTH: " + canvas.width );
+      //console.log( "WIDTH: " + canvas.width );
         var ctx = canvas.getContext('2d');
         var background = 'image';
 
@@ -36,12 +36,11 @@ $(function () {
             for (var byteCell = 0; byteCell < QRBytes[byteRow].length; byteCell++) {
                 if ((background === 'image' && !has_image) || background === 'noise') {
                     // Draw random bytes
-                    ctx.fillStyle = 'pink';
                     for (var subRow = 0; subRow < 3; subRow++) {
                         for (var subCell = 0; subCell < 3; subCell++) {
-                            ctx.fillStyle = 'red';
+                            ctx.fillStyle = 'black';
                             if (Math.random() < 0.5) {
-                                ctx.fillStyle = 'green';
+                                ctx.fillStyle = 'white';
                             }
                             ctx.fillRect(byteRow * blockSize + (subRow * pixelSize), byteCell * blockSize + (subCell * pixelSize), pixelSize, pixelSize);
                         }
@@ -49,7 +48,7 @@ $(function () {
                 }
 
                 // Middle Cell
-                ctx.fillStyle = QRBytes[byteRow][byteCell] ? 'yellow' : 'brown';
+                ctx.fillStyle = QRBytes[byteRow][byteCell] ? 'black' : 'white';
                 ctx.fillRect(byteRow * blockSize + pixelSize, byteCell * blockSize + pixelSize, pixelSize, pixelSize);
             }
         }
@@ -88,8 +87,8 @@ $(function () {
         var ctxPixel = canvasPixel.getContext('2d');
         var canvasTemp = document.createElement('canvas');
         canvasTemp.width = canvasTemp.height = (canvasPixel.width / pixelSize);
-      console.log("drawPixel Width: " + canvasTemp.width );
-      console.log("pixelSize: " + pixelSize );
+      //console.log("drawPixel Width: " + canvasTemp.width );
+      //console.log("pixelSize: " + pixelSize );
         var ctxTemp = canvasTemp.getContext('2d');
 
         ctxPixel.imageSmoothingEnabled = false;
@@ -110,7 +109,7 @@ $(function () {
         var pixels = ctxPixel.getImageData(0, 0, canvasPixel.width, canvasPixel.height);
         var d = pixels.data;
         var width = Math.sqrt(d.length / 4) / pixelSize;
-      console.log("drawThreshold Width: " + width );
+      //console.log("drawThreshold Width: " + width );
         for (var i = 0; i < d.length; i += 4) {
             var r = d[i];
             var g = d[i + 1];
