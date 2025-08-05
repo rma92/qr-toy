@@ -29,6 +29,7 @@ function startTimer(delay)
 var pageid = -1;
 var numpages = 0;
 var chunks = [];
+window.chunks = chunks;
 var icrc32 = 0;
 var bLzma = 0;
 
@@ -36,6 +37,37 @@ var cachedLastQr = null;
 var cachedFileContents = null;
 var cachedFileContentsRaw = null;
 
+/*
+ * Scale the output canvas if the fit box is checked.
+ */
+function scaleCanvasOut()
+{
+    dCanvas = document.getElementById('cOut');
+  //TODO: Change this to use the actual dimensions of the controls.
+    xAdjustment = (document.getElementById('controlBox').style.display == 'none')?50:500;
+    if( document.getElementById('bFit').checked )
+    {
+      //see if there is more vertical space or more horizontal space.
+      var smallerWindowDimension = Math.min(window.innerHeight - xAdjustment, window.innerWidth - 25 );
+      if( dCanvas.width > smallerWindowDimension )
+      { 
+        //if the canvas is too small
+        dCanvas.style.width = Math.min( dCanvas.width, smallerWindowDimension) + 'px';
+        dCanvas.style.height = (dCanvas.height * Math.min( dCanvas.width, smallerWindowDimension) / dCanvas.width) + 'px';
+      }
+      else
+      {
+        //if the canvas is too big
+      dCanvas.style.width = Math.max( dCanvas.width, smallerWindowDimension) + 'px';
+      dCanvas.style.height = (dCanvas.height * Math.max( dCanvas.width, smallerWindowDimension) / dCanvas.width) + 'px';
+      }
+    }
+    else
+    {
+      dCanvas.style.width = '';
+      dCanvas.style.height = '';
+    }
+}
 /*
  * Make segments optimally
  */
@@ -698,6 +730,8 @@ function renderQr(qr)
   {
     renderQr_Extended(renderer, dCanvas, qr, scale, whiteColor, blackColor, backgroundStyle);
   }
+  scaleCanvasOut();
+  
 }//renderQr
 
 /*
@@ -737,6 +771,7 @@ function makeCodeInt (qStr)
   cachedLastQr = qr;
   renderQr(qr);
   //Draw the QR code.
+
 }//makeCodeInt(qStr)
 
 //Calls makecode in response to a UI change.
@@ -790,6 +825,7 @@ function ui_loadFileToInput()
         {
           document.getElementById("split_size").value = 410;
           document.getElementById("eccLevel").value = 'L';
+          document.getElementById("iMinVersion").value = 17;
           document.getElementById("scale").value = 9;
         }
         encoded = _arrayBufferToBase64( fileContents );
@@ -811,12 +847,14 @@ function ui_loadFileToInput()
             document.getElementById("split_size").value = 1100;
             document.getElementById("eccLevel").value = 'L';
             document.getElementById("scale").value = 5;
+            document.getElementById("iMinVersion").value = 17;            
           }
           else
           {
             document.getElementById("split_size").value = 1400;
             document.getElementById("eccLevel").value = 'L';
             document.getElementById("scale").value = 9;
+            document.getElementById("iMinVersion").value = 17;            
           }
         }
         encoded = b10encode( fileContents );
@@ -970,6 +1008,11 @@ document.getElementById('buttonToggleControls').addEventListener("click",functio
     } else {
       x.style.display = "none";
     }
+    scaleCanvasOut();
+  });
+document.getElementById('bFit').addEventListener("change",function()
+  {
+
   });
 document.getElementById('buttonToStaticPage').addEventListener("click", makeStaticPage);
 document.getElementById('fileInput').addEventListener('change', ui_loadFileToInput);
