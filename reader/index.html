@@ -15,6 +15,19 @@
     <link rel="apple-touch-icon" sizes="144x144" href="htqr_read.png">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
+<style>
+html, body{ margin:0;padding:0}
+#canvas {
+  width: 98vw; /* 100% of the viewport width */
+  padding:0;
+  margin:0;
+  max-width: 800px;
+  height: auto; /* maintain aspect ratio */
+  display: block;
+  border: 2px solid red;
+}
+
+</style>
   </head>
 
   <body style="text-align: center">
@@ -271,7 +284,8 @@
           cameraSelector.appendChild(errorOption);
         }
       }
-            
+       
+      
     </script>
   </body>
 
