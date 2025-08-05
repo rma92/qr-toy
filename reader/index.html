@@ -4,6 +4,11 @@
   <head>
     <title>HotQR scanner</title>
     <link rel="shortcut icon" href="#" />
+    <script>
+      function isPhone() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      }
+    </script>
     <!--<script src="zxing_reader.js"></script>-->
     <script src="lzma_worker-min.js"></script>
     <script src="hotqr_reader.js"></script>
@@ -86,6 +91,17 @@
         zxing = instance; // this line is supposedly not required but with current emsdk it is :-/
       });
 
+      //if iPhone:
+      if (isPhone())
+      {
+        document.getElementById('cameraSelector').value = "environment";
+      }
+      else
+      {
+        document.getElementById('cameraSelector').value = "user"; // front camera
+      }
+
+      
       const cameraSelector = document.getElementById("cameraSelector");
       const focusControl = document.getElementById("focusControl");      
       const format = document.getElementById("format");
@@ -173,6 +189,7 @@
         const constraints = {
           video: {
             facingMode: cameraSelector.value,
+            focusMode: "manual"
           },
         };
 
@@ -212,11 +229,50 @@
       */
       function updateFocus(value) {
         const track = stream.getVideoTracks()[0];
-        console.log(track);
+        //console.log(track);
         track.applyConstraints({
           advanced: [{ focusDistance: value }],
         });
       }
+
+      // Function to populate cameraSelector with available video devices
+      async function populateCameraSelector() {
+        const cameraSelector = document.getElementById("cameraSelector");
+        
+        // Clear any existing options
+        cameraSelector.innerHTML = "";
+
+        try {
+          // Get the list of media devices
+          const devices = await navigator.mediaDevices.enumerateDevices();
+
+          let cameraCount = 0;
+
+          // Loop through devices and add only video input devices
+          devices.forEach(device => {
+            if (device.kind === 'videoinput') {
+              const option = document.createElement("option");
+              option.value = device.deviceId;
+              option.text = device.label || `Camera ${++cameraCount}`;
+              cameraSelector.appendChild(option);
+            }
+          });
+
+          if (cameraSelector.options.length === 0) {
+            const noCameraOption = document.createElement("option");
+            noCameraOption.value = "";
+            noCameraOption.text = "No cameras found";
+            cameraSelector.appendChild(noCameraOption);
+          }
+        } catch (error) {
+          console.error("Error accessing media devices:", error);
+          const errorOption = document.createElement("option");
+          errorOption.value = "";
+          errorOption.text = "Error accessing cameras";
+          cameraSelector.appendChild(errorOption);
+        }
+      }
+            
     </script>
   </body>
 
