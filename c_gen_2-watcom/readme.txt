@@ -10,5 +10,5 @@ cl main.c qrcode.c
 C:\WATCOM\binnt\cl.exe main.c qrcode.c
 
 Compile in OpenWatcom for DOS / 8086:
-wcl -0 -mt main.c qrcode.c
-C:\WATCOM\binnt\wcl -0 -mt main.c qrcode.c
+wcl -0 -mt -DDOS_BUILD -fe=qrdos.com main.c qrcode.c
+C:\WATCOM\binnt\wcl -0 -mt -DDOS_BUILD -fe=qrdos.com main.c qrcode.c
