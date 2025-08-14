@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "qrcode.h"
 
+
 #define MAX_DATA_LEN 4096
 #define QR_SCALE_MIN 2
 #define QR_SCALE_MAX 2000
@@ -18,7 +19,11 @@ int windowWidth = 0, windowHeight = 0;
 void ParseCommandLine(LPSTR lpCmdLine) {
   char *token = strtok(lpCmdLine, " ");
   while (token) {
-    if (strcmp(token, "-v") == 0) {
+    if (strcmp(token, "-?") == 0 || strcmp(token, "/?") == 0 || strcmp(token, "-h") == 0)
+    {
+      MessageBox(0, "WinQR - Generate QR Code\r\nUsage: WinQR.exe [flags] [string]\r\n/? -? -h Display this help\r\n-v [1-40] specify the QR code version (size)\r\n-e [L|M|Q|H] Set ECC level\r\n-M open the window maximized", "WinQR Help", 0);
+    }
+    else if (strcmp(token, "-v") == 0) {
       token = strtok(NULL, " ");
       if (token) version = atoi(token);
     } else if (strcmp(token, "-e") == 0) {
@@ -59,48 +64,54 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         int xOffset;
         int yOffset;
         PAINTSTRUCT ps;
+        HBITMAP bmp;
+        RECT bg;
         HDC hdc = BeginPaint(hwnd, &ps);
         HDC memDC = CreateCompatibleDC(hdc);
 
-    // Calculate dynamic scale
-    scaleX = windowWidth / qrSize;
-    scaleY = windowHeight / qrSize;
-    scale = min(scaleX, scaleY);
-    scale = max(QR_SCALE_MIN, min(scale, QR_SCALE_MAX));
+        // Calculate dynamic scale
+        scaleX = windowWidth / qrSize;
+        scaleY = windowHeight / qrSize;
+        scale = min(scaleX, scaleY);
+        scale = max(QR_SCALE_MIN, min(scale, QR_SCALE_MAX));
 
-    bmpWidth = qrSize * scale;
-    bmpHeight = qrSize * scale;
+        bmpWidth = qrSize * scale;
+        bmpHeight = qrSize * scale;
 
-    HDC memDC = CreateCompatibleDC(hdc);
-    HBITMAP bmp = CreateCompatibleBitmap(hdc, bmpWidth, bmpHeight);
-    SelectObject(memDC, bmp);
+        memDC = CreateCompatibleDC(hdc);
+        bmp = CreateCompatibleBitmap(hdc, bmpWidth, bmpHeight);
+        SelectObject(memDC, bmp);
 
-    RECT bg = {0, 0, bmpWidth, bmpHeight};
-    FillRect(memDC, &bg, (HBRUSH)(COLOR_WINDOW + 1));
+        bg;
+        bg.left = 0;
+        bg.top = 0;
+        bg.right = bmpWidth;
+        bg.bottom = bmpHeight;
+        FillRect(memDC, &bg, (HBRUSH)(COLOR_WINDOW + 1));
 
-    for (y = 0; y < qrSize; y++) {
-        for (x = 0; x < qrSize; x++) {
+        for (y = 0; y < qrSize; y++) {
+          for (x = 0; x < qrSize; x++) {
             if (qrcode_getModule(&qrcode, x, y)) {
-                RECT r = {
-                    x * scale,
-                    y * scale,
-                    (x + 1) * scale,
-                    (y + 1) * scale
-                };
-                FillRect(memDC, &r, (HBRUSH)GetStockObject(BLACK_BRUSH));
+              RECT r;
+              r.left   = x * scale;
+              r.top    = y * scale;
+              r.right  = (x + 1) * scale;
+              r.bottom = (y + 1) * scale;
+
+              FillRect(memDC, &r, (HBRUSH)GetStockObject(BLACK_BRUSH));
             }
+          }
         }
-    }
 
-    xOffset = (windowWidth - bmpWidth) / 2;
-    yOffset = (windowHeight - bmpHeight) / 2;
-    BitBlt(hdc, xOffset, yOffset, bmpWidth, bmpHeight, memDC, 0, 0, SRCCOPY);
+        xOffset = (windowWidth - bmpWidth) / 2;
+        yOffset = (windowHeight - bmpHeight) / 2;
+        BitBlt(hdc, xOffset, yOffset, bmpWidth, bmpHeight, memDC, 0, 0, SRCCOPY);
 
-    DeleteObject(bmp);
-    DeleteDC(memDC);
-    EndPaint(hwnd, &ps);
-    return 0;
-}
+        DeleteObject(bmp);
+        DeleteDC(memDC);
+        EndPaint(hwnd, &ps);
+        return 0;
+      }
 
     case WM_DESTROY:
       PostQuitMessage(0);
@@ -110,42 +121,53 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
+  HWND hWnd;
+  MSG msg;
+  WNDCLASS wc;
   ParseCommandLine(lpCmdLine);
 
   if (qrcode_initText(&qrcode, (uint8_t *)qrcodeData, version, eccLevel, inputData) != 0) {
-    MessageBox(NULL, "QR code generation failed", "Error", MB_ICONERROR);
+    MessageBox(NULL, "QR code generation failed", "Error", 0);
     return 1;
   }
-  HWND hwnd;
-  MSG msg;
-  WNDCLASS wc = {0};
-  wc.lpfnWndProc = WndProc;
-  wc.hInstance = hInstance;
   wc.lpszClassName = "QRCodeWindow";
-  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-  wc.hCursor = LoadCursor(NULL, IDC_ARROW);  
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc = WndProc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = hInstance;
+  wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+  wc.hbrBackground = GetStockObject(WHITE_BRUSH);
+  wc.lpszMenuName = NULL;
   RegisterClass(&wc);
-
-  hwnd = CreateWindow("QRCodeWindow", "QR Code Viewer",
+  // Create window
+  hWnd = CreateWindow("QRCodeWindow", "Hello Win16",
       WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT,
-      400, 400, NULL, NULL, hInstance, NULL);
+      300, 300,
+      NULL, NULL, hInstance, NULL);
 
-  if (!hwnd) return 1;
-
-  if (maximizeWindow) {
-    ShowWindow(hwnd, SW_MAXIMIZE);
-  } else {
-    ShowWindow(hwnd, nCmdShow);
+  if (!hWnd) {
+    MessageBox(0,"Error",0,0);
+    return 0;
   }
 
-  UpdateWindow(hwnd);
+  if (maximizeWindow) {
+    ShowWindow(hWnd, SW_MAXIMIZE);
+  } else {
+    ShowWindow(hWnd, nCmdShow);
+  }
 
+  UpdateWindow(hWnd);
+
+  // Message loop
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
 
-  return (int)msg.wParam;
+  return msg.wParam;
 }
 
