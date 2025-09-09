@@ -67,6 +67,9 @@ html, body{ margin:0;padding:0}
           </select>
         </td>
         <td>
+          <label><input id="colorSweep" type="checkbox" checked>R→G→B→Gray</label>
+        </td>
+        <td>
           Mode:<br/>
           <select id="mode">
             <option value="true" selected="">Normal</option>
@@ -138,6 +141,7 @@ html, body{ margin:0;padding:0}
         var imageData = canvas.getContext('2d').getImageData(0, 0, imgWidth, imgHeight);
         var sourceBuffer = imageData.data;
 
+        /*
         if (zxing != null) {
           var buffer = zxing._malloc(sourceBuffer.byteLength);
           zxing.HEAPU8.set(sourceBuffer, buffer);
@@ -146,6 +150,57 @@ html, body{ margin:0;padding:0}
           return result;
         } else {
           return { error: "ZXing not yet initialized" };
+        }
+        */
+        const sweep = document.getElementById('colorSweep')?.checked;
+        return tryDecodeWithFilters(imageData, format, mode, !!sweep);
+      }
+
+      // Make a filtered copy of RGBA pixels into a fresh Uint8ClampedArray
+      function makeFilteredBuffer(src, mode) {
+        const out = new Uint8ClampedArray(src.length);
+        for (let i = 0; i < src.length; i += 4) {
+          const r = src[i], g = src[i+1], b = src[i+2], a = src[i+3];
+          let R=r, G=g, B=b;
+          if (mode === 'red')     { G = 0; B = 0; }
+          else if (mode === 'green'){ R = 0; B = 0; }
+          else if (mode === 'blue') { R = 0; G = 0; }
+          else if (mode === 'gray') {
+            // Rec. 709 luma
+            const y = (0.2126*r + 0.7152*g + 0.0722*b) | 0;
+            R = G = B = y;
+          }
+          out[i] = R; out[i+1] = G; out[i+2] = B; out[i+3] = a;
+        }
+        return out;
+      }
+
+      // Try decoding the same frame with R-only, G-only, B-only, then Gray (first hit wins).
+      function tryDecodeWithFilters(imageData, format, mode, sweepEnabled) {
+        // 1) If sweep is off: just try original (fast path)
+        if (!sweepEnabled) {
+          return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+        }
+        // 2) Sweep: red -> green -> blue -> gray
+        const order = ['red','green','blue','gray'];
+        for (const pass of order) {
+          const buf = makeFilteredBuffer(imageData.data, pass);
+          const res = readBarcodeFromCanvasInternal(buf, imageData.width, imageData.height, format, mode);
+          if (res && res.format && !res.error) return res;
+        }
+        // 3) Fallback: original
+        return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+      }
+
+      // Lower-level: copy a given RGBA buffer to ZXing heap and call into WASM once
+      function readBarcodeFromCanvasInternal(rgbaBuffer, imgWidth, imgHeight, format, mode) {
+        if (!zxing) return { error: "ZXing not yet initialized" };
+        const ptr = zxing._malloc(rgbaBuffer.byteLength);
+        try {
+          zxing.HEAPU8.set(rgbaBuffer, ptr);
+          return zxing.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, mode, format);
+        } finally {
+          zxing._free(ptr);
         }
       }
 
