@@ -4,10 +4,10 @@
   <head>
     <title>HotQR scanner</title>
     <link rel="shortcut icon" href="#" />
-    <!--<script src="zxing_reader.js"></script>-->
+    <script src="zxing_reader.js"></script>
     <script src="lzma_worker-min.js"></script>
     <script src="hotqr_reader.js"></script>
-    <script src="zxing_reader.unmin.js"></script>
+    <!--<script src="zxing_reader.unmin.js"></script>-->
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -42,7 +42,7 @@ html, body{ margin:0;padding:0}
         <td>
           Format:<br/>
           <select id="format">
-            <option value="" selected="">Any</option>
+            <option value="">Any</option>
             <option value="Aztec">Aztec</option>
             <option value="Code39">Codabar</option>
             <option value="CODE_39">Code39</option>
@@ -57,7 +57,7 @@ html, body{ margin:0;padding:0}
             <option value="EAN13">EAN-13</option>
             <option value="ITF">ITF</option>
             <option value="PDF417">PDF417</option>
-            <option value="QRCode">QRCode</option>
+            <option value="QRCode" selected>QRCode</option>
             <option value="MicroQRCode">Micro QRCode</option>
             <option value="RMQRCode">rMQR Code</option>
             <option value="UPCA">UPC-A</option>
@@ -285,6 +285,9 @@ html, body{ margin:0;padding:0}
         }
       }
        
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      }
       
     </script>
   </body>

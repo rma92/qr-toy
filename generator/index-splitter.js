@@ -12,8 +12,8 @@ var szHeaderTerminator = "$$";
 var qrGenInterval = null;
 
 //prefix to beginning of string
-//var qStrPrefix = "Q";
-var qStrPrefix = "HTTP://QR.HT/";
+var qStrPrefix = "Q";
+//var qStrPrefix = "HTTP://QR.HT/";
 
 /*
  * Start the qr code refresh timer.  Replaces any previous interval if needed.
@@ -736,41 +736,104 @@ function renderQr(qr)
 
 /*
  * Generates the Qr Code and puts it as text and the image.
+ * 
+ * TODO: Since this is where the generation occurs, we can invoke other code types here.
+ *
+ * codeMode is a string:
+ * qr - (the original high precision method of making a QR code)
+ * qr2 - barcode.js quickresponse
+ * microqr - barcode.js microQR (quickresponse but version set to -1)
+ * aztec - barcode.js aztec code
+ * pdf417 - barcode.js pdf417
+ * datamatrix - barcode.js datamatrix
  *
  * This is the main mid-level invocation to creating a code from the user side.
  */
-function makeCodeInt (qStr)
+function makeCodeInt (qStr, codeMode = 'qr2')
 {
   //Error checking
-  if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ")");
-  document.getElementById('strlen').value = qStr.length;
+  if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ", " + codeMode + ")");
+  var qr = {};//hold output code, set data array to qr.modules
+  qr.mask = -1;
+  qr.version = -1;
+  qr.size = -1;
 
-  if( qStr.length > 12680 )
+  if( codeMode == 'qr' )
   {
-    clearInterval( qrGenInterval );
-    document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
-    return;
+    document.getElementById('strlen').value = qStr.length;
+
+    if( qStr.length > 12680 )
+    {
+      clearInterval( qrGenInterval );
+      document.getElementById('pageDataOut').value = "Max length:\nH: 1268\n1663, 2331, 2953";
+      return;
+    }
+
+    //Make the QR Code
+    var eccStr = document.getElementById('eccLevel').value;
+    var minVersion = document.getElementById('iMinVersion').value;
+    var maxVersion = document.getElementById('iMaxVersion').value;
+    var iMask = document.getElementById('iMask').value;
+    //generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
+    try
+    {
+      qr = generateQr(qStr, eccStr, minVersion, maxVersion, iMask, true);
+    }
+    catch(ex)
+    {
+      document.getElementById("pageDataOut").value = ex.message;
+      console.log(ex.message);
+      return;
+    }
+    console.log( "makeCodeInt: " ); console.log(qr);
+    document.getElementById('pageDataOut').value = "Mask: " + qr.mask + " Ver: " + qr.version;
+  }// codemMode == 'qr'
+  else if( codeMode == 'qr2' )
+  {
+    var eccStr = document.getElementById('eccLevel').value;    
+    qr.modules = quickresponse(qStr, eccStr);
+  }
+  else if( codeMode == 'microqr')
+  {
+    var eccStr = document.getElementById('eccLevel').value;
+    qr.modules = quickresponse(qStr, eccStr, -1); 
+  }
+  else if( codeMode == 'aztec')
+  {
+    qr.modules = aztec(qStr); 
+  }
+  else if( codeMode == 'pdf417')
+  {
+    /**	PDF417 bar code symbol creation according ISO/IEC 15438:2006
+ *	creates PDF417, CompactPDF417 or MicroPDF417 bar code symbol as a javascript matrix.
+ * @param text to encode
+ * @param level optional: security level: 0-7; (null for auto 2-5)
+ * @param cols optional: # of columns: 1-30 (0 for auto)
+ * @param rows optional: # of rows: 3-90 (0 for auto)
+ *	for cols / rows > 90 they define an aspect_ratio
+ * @param type optional: barcode type (f:full, c:compact, m:micro)
+ * @return matrix array of PDF417 symbol ([] if text is too long)
+ */
+    qr.modules = pdf417(qStr, null, 1, 0, 0); 
+    var len = qr.modules[0].length;
+    for(i = qr.modules.length; i < len; ++i )
+    {
+      qr.modules[i] = [];
+      for(j = 0; j < len; ++j )
+      {
+        qr.modules[i][j] = 0;
+      }
+    }
+  }
+  else if( codeMode == 'datamatrix')
+  {
+    qr.modules = datamatrix(qStr); 
   }
 
-  //Make the QR Code
-  var eccStr = document.getElementById('eccLevel').value;
-  var minVersion = document.getElementById('iMinVersion').value;
-  var maxVersion = document.getElementById('iMaxVersion').value;
-  var iMask = document.getElementById('iMask').value;
-  //generateQr(qStr, eccStr = 'L', minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true )
-  try
-  {
-    var qr = generateQr(qStr, eccStr, minVersion, maxVersion, iMask, true);
-  }
-  catch(ex)
-  {
-    document.getElementById("pageDataOut").value = ex.message;
-    console.log(ex.message);
-    return;
-  }
-  cachedLastQr = qr;
-  renderQr(qr);
   //Draw the QR code.
+  cachedLastQr = qr;
+  console.log(qr);
+  renderQr(qr);
 
 }//makeCodeInt(qStr)
 

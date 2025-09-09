@@ -33,3 +33,13 @@ C:\WATCOM\binnt\wcc winqr16.c -bt=windows -ms
 C:\WATCOM\binnt\wcc qrcode.c -bt=windows -ms
 C:\WATCOM\binnt\wlink system windows name winqr16 file winqr16.obj,qrcode.obj library user,gdi,kernel
 C:\local\otvdm-v0.9.0\otvdm.exe winqr16.exe
+
+Compile winqr_os2.c for OS/2
+set WATCOM=C:\WATCOM
+set PATH=%WATCOM%\BINNT;%PATH%
+set INCLUDE=%WATCOM%\H;%WATCOM%\h\os2
+set LIB=%WATCOM%\LIB386;%WATCOM%\LIB386\os2
+
+wcc386 winqr_os2.c -bt=os2
+wcc386 qrcode.c -bt=os2
+wlink system os2v2 name winqr_os2 file winqr_os2.obj,qrcode.obj library os2
