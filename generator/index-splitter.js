@@ -749,8 +749,15 @@ function renderQr(qr)
  *
  * This is the main mid-level invocation to creating a code from the user side.
  */
-function makeCodeInt (qStr, codeMode = 'qr2')
+function makeCodeInt (qStr, codeMode = null)
 {
+  if (codeMode == null && document.getElementById('codeMode')) {
+    codeMode = document.getElementById('codeMode').value || codeMode;
+  }
+  else
+  {
+    codeMode = 'qr';
+  }
   //Error checking
   if( bQrSplitterDebug ) console.log( "makeCodeInt( qStr ) (" + qStr + ", " + codeMode + ")");
   var qr = {};//hold output code, set data array to qr.modules
@@ -785,7 +792,7 @@ function makeCodeInt (qStr, codeMode = 'qr2')
       console.log(ex.message);
       return;
     }
-    console.log( "makeCodeInt: " ); console.log(qr);
+    //console.log( "makeCodeInt: " ); console.log(qr);
     document.getElementById('pageDataOut').value = "Mask: " + qr.mask + " Ver: " + qr.version;
   }// codemMode == 'qr'
   else if( codeMode == 'qr2' )
@@ -832,7 +839,7 @@ function makeCodeInt (qStr, codeMode = 'qr2')
 
   //Draw the QR code.
   cachedLastQr = qr;
-  console.log(qr);
+  //console.log(qr);
   renderQr(qr);
 
 }//makeCodeInt(qStr)
@@ -914,7 +921,7 @@ function ui_loadFileToInput()
           }
           else
           {
-            document.getElementById("split_size").value = 1400;
+            document.getElementById("split_size").value = 6800;
             document.getElementById("eccLevel").value = 'L';
             document.getElementById("scale").value = 9;
             document.getElementById("iMinVersion").value = 17;            
@@ -1043,6 +1050,7 @@ document.getElementById('iMinVersion').addEventListener("input", ui_makeCode);
 document.getElementById('iMaxVersion').addEventListener("input", ui_makeCode);
 document.getElementById('szWhiteColor').addEventListener("input", ui_makeCode);
 document.getElementById('szBlackColor').addEventListener("input", ui_makeCode);
+document.getElementById('codeMode').addEventListener("change", ui_makeCode);
 document.getElementById('szRenderer').addEventListener("input", function()
   {
     rendererDropdownChanged();

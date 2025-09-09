@@ -50,46 +50,6 @@
     <div id=controlBox>
     <textarea id="text" style="width:80%">HTTP://RM.VG/</textarea><br />
     <table>
-      <tr>
-        <td>
-          CodeMode:<br?>
-          <select id="codeMode">
-            <option value="qr" selected>qr</option>
-            <option value="microqr">microqr</option>
-            <option value="aztec">aztec</option>
-            <option value="pdf417">pdf417</option>
-            <option value="datamatrix">datamatrix</option>
-            <option value="qr2">qr (barcode.js)</option>
-          </select>
-        </td>
-      </tr>
-      <tr>
-        <th colspan=4>Load File</th>
-      </tr>
-      <tr>
-        <td>
-          File:<br/>
-          <input type="file" id="fileInput">          
-        </td>
-        <td>
-          <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64<br/>
-          <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
-          <input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"/>Raw
-        </td>
-        <td>
-          <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
-          <span id="fileSizeOut">(filesize)</span>
-        </td>
-        <td>
-          Filename:
-          <br/>
-          <input id="szFilename" value="out.txt" />
-        </td>
-      </tr>
-    </table>
-    <table>
-      <tr>
-      </tr>
       <tr><th colspan=4>QRcode</th></tr>
       <tr>
         <td>ECC Level:
@@ -152,8 +112,33 @@
           <input id="split_time" type="number" value="130" min=1 max=10000 />
         </td>
         <td colspan=3>
+          Filename:
+          <br/>
+          <input id="szFilename" value="out.txt" />
         </td>
         
+      </tr>
+    </table>
+    <table>
+      <tr>
+        <th colspan=4>Load File</th>
+      </tr>
+      <tr>
+        <td>
+          File:<br/>
+          <input type="file" id="fileInput">          
+        </td>
+        <!--<td>
+          Encode as:
+        </td>-->
+        <td>
+          <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64<br/>
+          <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
+          <input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"/>Raw
+        </td>
+        <td>
+          <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
+          <span id="fileSizeOut">(filesize)</span>
       </tr>
     </table>
     <table>
@@ -222,7 +207,7 @@
       <br/>
     </div>
     
-    <!--<script src="barcode.min.js"></script>-->
+    <!--<script src="jquery-3.6.0.slim.min.js"></script>-->
     <script src="barcode.min.js"></script>
     <script type="text/javascript" src="index-splitter.js"></script>
     <script src="lzma_worker-min.js"></script>
