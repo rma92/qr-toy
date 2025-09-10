@@ -80,11 +80,36 @@
           <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
           <span id="fileSizeOut">(filesize)</span>
         </td>
+      </tr>
+      <tr>
+        <td>
+          <label style="display:block;margin-top:.5rem">
+            <input type="checkbox" id="bRgbOverlay">
+            RGB overlay (file mode only)
+          </label>
+          <label style="display:block;margin-top:.25rem">
+            <input type="checkbox" id="bInvertRGB">
+            Invert RGB overlay (modules become light on dark)
+          </label>
+        </td>
         <td>
           Filename:
           <br/>
           <input id="szFilename" value="out.txt" />
         </td>
+        <td>
+          Split Size:
+          <br/>
+          <input id="split_size" type="number" value="0" min=0 max=8000 />
+        </td>
+        <td>
+          Split Time (ms):
+          <br/>
+          <input id="split_time" type="number" value="130" min=1 max=10000 />
+        </td>
+        <td colspan=3>
+        </td>
+      </tr>
       </tr>
     </table>
     <table>
@@ -139,21 +164,6 @@
           <br/>
           <input type="number" id="iMaxVersion" value="40" min="1" max="40"/>
         </td>
-      </tr>
-      <tr>
-        <td>
-          Split Size:
-          <br/>
-          <input id="split_size" type="number" value="0" min=0 max=8000 />
-        </td>
-        <td>
-          Split Time (ms):
-          <br/>
-          <input id="split_time" type="number" value="130" min=1 max=10000 />
-        </td>
-        <td colspan=3>
-        </td>
-        
       </tr>
     </table>
     <table>

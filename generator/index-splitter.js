@@ -454,6 +454,31 @@ function makeCode()
   }
 } //makeCode()
 
+function buildQStrForPage(pageIndex) {
+  const szFilename = document.getElementById("szFilename").value;
+
+  // fileData contains the encoding - B10 or B64 if applicable.
+  let fileData = "";
+  const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
+  if (encodingType === 'base64') {
+    fileData = (bLzma) ? "LB6" : "B64";
+  } else if (encodingType === 'base10') {
+    fileData = (bLzma) ? "LB1" : "B10";
+  }
+
+  // same header you already use in makeCodeByChunkId()
+  // Q $ page $ total $ crc32 $ filename $ fileData $$ chunk
+  return (
+    qStrPrefix + szHeaderSeparator +
+    pageIndex + szHeaderSeparator +
+    chunks.length + szHeaderSeparator +
+    icrc32 + szHeaderSeparator +
+    szFilename + szHeaderSeparator +
+    fileData + szHeaderTerminator +
+    chunks[pageIndex]
+  );
+}
+
 function makeCodeByChunkId( pageid )
 {
   var szFilename = document.getElementById("szFilename").value;
@@ -475,14 +500,50 @@ function makeCodeByChunkId( pageid )
   makeCodeInt( qStr );
 }
 
-function makeNextCode()
-{
-  if( bQrSplitterDebug ) console.log( "makeNextCode()  pageid: " + pageid );
+function makeNextCode() {
+  if (bQrSplitterDebug) console.log("makeNextCode()  pageid: " + pageid);
+
+  const useRgbOverlay = (document.getElementById('split_size').value != 0) &&
+                        document.getElementById('bRgbOverlay') &&
+                        document.getElementById('bRgbOverlay').checked;
+
+  if (!useRgbOverlay) {
+    // existing single-frame behavior
+    ++pageid;
+    if (pageid >= chunks.length) pageid = 0;
+    makeCodeByChunkId(pageid);
+    document.getElementById("pageDataOut").value =
+      pageid + " out of " + chunks.length + " v: " + cachedLastQr.version + " mask: " + cachedLastQr.mask + " size: " + cachedLastQr.size;
+    return;
+  }
+
+  // --- RGB overlay mode: three consecutive pages per frame ---
+  // advance once to pick the 'R' page
   ++pageid;
-  if( pageid >= chunks.length ) pageid = 0;
-  makeCodeByChunkId( pageid );
-  document.getElementById("pageDataOut").value = pageid + " out of " + chunks.length + " v: " + cachedLastQr.version + " mask: " + cachedLastQr.mask + " size: " + cachedLastQr.size;
-} //makeNextCode()
+  if (pageid >= chunks.length) pageid = 0;
+
+  const pR = pageid;
+  const pG = (pR + 1) % chunks.length;
+  const pB = (pR + 2) % chunks.length;
+
+  const qStrR = buildQStrForPage(pR);
+  const qStrG = buildQStrForPage(pG);
+  const qStrB = buildQStrForPage(pB);
+
+  const qrR = computeQrForPayload(qStrR);
+  const qrG = computeQrForPayload(qStrG);
+  const qrB = computeQrForPayload(qStrB);
+
+  // Render the composite
+  cachedLastQr = qrR; // keep something sensible for the HUD
+  renderRgbComposite(qrR, qrG, qrB);
+
+  document.getElementById("pageDataOut").value =
+    `${pR},${pG},${pB} out of ${chunks.length}`;
+
+  // so next tick we continue after the 'B' frame
+  pageid = pB;
+}//makeNextCode()
 
 //helper function to split string into array.
 /*
@@ -633,6 +694,87 @@ function renderQr_graphicsDefault(dCanvas, qr, scale = 2, fillStyleWhite = "#fff
   }
 }//renderQr_graphicsDefault
 
+/*
+ * renderQr - modulesOnly - used for multicolor codes.
+ */
+function renderQr_modulesOnly(dCanvas, qr, scale, color, backgroundAlreadyDrawn = true) {
+  const offsetX = 10, offsetY = 10;
+  const size = qr.modules.length * scale;
+
+  if (!backgroundAlreadyDrawn) {
+    dCanvas.width = size + offsetX * 2;
+    dCanvas.height = size + offsetY * 2;
+    const ctx0 = dCanvas.getContext('2d');
+    ctx0.clearRect(0, 0, dCanvas.width, dCanvas.height);
+    ctx0.fillStyle = '#ffffff';
+    ctx0.fillRect(0, 0, dCanvas.width, dCanvas.height);
+  }
+
+  const ctx = dCanvas.getContext('2d');
+  ctx.fillStyle = color;
+  for (let y = 0; y < qr.modules.length; ++y) {
+    for (let x = 0; x < qr.modules[y].length; ++x) {
+      if (qr.modules[y][x]) {
+        ctx.fillRect(x * scale + offsetX, y * scale + offsetY, scale, scale);
+      }
+    }
+  }
+}//modulesOnly
+
+function renderRgbComposite(qrR, qrG, qrB) {
+  // scale & margins (keep consistent with your normal renderer)
+  let scale = 2;
+  const scaleEl = document.getElementById('scale');
+  if (scaleEl && scaleEl.value) scale = parseInt(scaleEl.value, 10) || 2;
+
+  const offX = 10, offY = 10;
+  const n = qrR.modules.length; // assume all three are same size
+  const width  = n * scale + offX * 2;
+  const height = n * scale + offY * 2;
+
+  const canvas = document.getElementById('cOut');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  // start with a white image
+  const img = ctx.createImageData(width, height);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i  ] = 255; // R
+    data[i+1] = 255; // G
+    data[i+2] = 255; // B
+    data[i+3] = 255; // A
+  }
+
+  // helper: darken channel c (0=R,1=G,2=B) for a scale x scale block
+  function darkenBlock(px, py, c) {
+    const x0 = px * scale + offX;
+    const y0 = py * scale + offY;
+    for (let dy = 0; dy < scale; dy++) {
+      let base = ((y0 + dy) * width + x0) * 4;
+      for (let dx = 0; dx < scale; dx++, base += 4) {
+        data[base + c] = 0; // darken only that channel
+      }
+    }
+  }
+
+  // walk modules once; apply per-channel darkening
+  for (let y = 0; y < n; y++) {
+    const rowR = qrR.modules[y];
+    const rowG = qrG.modules[y];
+    const rowB = qrB.modules[y];
+    for (let x = 0; x < n; x++) {
+      if (rowR[x]) darkenBlock(x, y, 0); // R channel
+      if (rowG[x]) darkenBlock(x, y, 1); // G channel
+      if (rowB[x]) darkenBlock(x, y, 2); // B channel
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+}
+
+
 function renderQr_graphicsCircle(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
 {
   var qrCodeSize = (qr.modules.length)* scale;
@@ -733,6 +875,37 @@ function renderQr(qr)
   scaleCanvasOut();
   
 }//renderQr
+
+function computeQrForPayload(qStr) {
+  let qr = { modules: [], size: 0, mask: 0, version: 0 };
+  const codeMode = document.getElementById('codeMode').value;
+
+  if (codeMode === 'qr') {
+    const eccStr = document.getElementById('eccLevel').value;
+    const minVersion = document.getElementById('iMinVersion').value;
+    const maxVersion = document.getElementById('iMaxVersion').value;
+    const iMask = document.getElementById('iMask').value;
+    qr = generateQr(qStr, eccStr, minVersion, maxVersion, iMask, true);
+  } else if (codeMode === 'qr2') {
+    const eccStr = document.getElementById('eccLevel').value;
+    qr.modules = quickresponse(qStr, eccStr);
+  } else if (codeMode === 'microqr') {
+    const eccStr = document.getElementById('eccLevel').value;
+    qr.modules = quickresponse(qStr, eccStr, -1);
+  } else if (codeMode === 'aztec') {
+    qr.modules = aztec(qStr);
+  } else if (codeMode === 'pdf417') {
+    qr.modules = pdf417(qStr, null, 1, 0, 0);
+    const len = qr.modules[0].length;
+    for (let i = qr.modules.length; i < len; ++i) {
+      qr.modules[i] = [];
+      for (let j = 0; j < len; ++j) qr.modules[i][j] = 0;
+    }
+  } else if (codeMode === 'datamatrix') {
+    qr.modules = datamatrix(qStr);
+  }
+  return qr;
+}
 
 /*
  * Generates the Qr Code and puts it as text and the image.
