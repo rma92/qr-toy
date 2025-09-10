@@ -68,8 +68,6 @@ html, body{ margin:0;padding:0}
         </td>
         <td>
           <label><input id="colorSweep" type="checkbox" checked>R→G→B→Gray</label>
-          <button id="startBtn">Start Camera</button>
-          <button id="stopBtn" disabled>Stop Camera</button>
         </td>
         <td>
           Mode:<br/>
@@ -88,7 +86,13 @@ html, body{ margin:0;padding:0}
         </td>
       </tr>
     </table>
+    <br /><br />
+
+      <div style="margin: 8px 0; display:flex; gap:8px; align-items:center;">
+        <button id="startBtn">Start Camera</button>
+        <button id="stopBtn" disabled>Stop Camera</button>
         <span id="cameraStatus" style="font-size:0.9em;opacity:0.75;"></span>
+      </div>
 
     <canvas id="canvas" width="640" height="480"></canvas>
     <br /><br />
@@ -157,6 +161,16 @@ const ctx = canvas.getContext("2d", { willReadFrequently: true });
       function setStatus(msg) { if (cameraStatus) cameraStatus.textContent = msg || ''; }
 
       async function startCamera(manual = false) {
+        // Ensure attributes that help autoplay on mobile/HTTPS
+        try {
+          video.setAttribute('playsinline','');
+          video.setAttribute('autoplay','');
+          video.setAttribute('muted','');
+          video.playsInline = true;
+          video.autoplay = true;
+          video.muted = true; // required for some mobile autoplay policies
+        } catch {}
+
         if (scanning) return;
         try {
           // use current cameraSelector choice; fall back to default if none
@@ -165,12 +179,33 @@ const ctx = canvas.getContext("2d", { willReadFrequently: true });
           };
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           video.srcObject = stream;
-          // play inside user gesture if manual; otherwise try/catch
-          try { await video.play(); } 
-          catch (e) { 
-            console.warn('video.play() blocked; waiting for user gesture.', e);
-            if (!manual) setStatus('Click "Start Camera" to begin'); 
+
+          // Try to play; if blocked, set up a one-time gesture resume
+          let played = false;
+          try { await video.play(); played = true; } 
+          catch (e) {
+            console.warn('video.play() blocked; scheduling gesture-resume', e);
+            if (!manual) setStatus('Tap anywhere or press "Start Camera" to begin');
           }
+          // If play() was blocked (mobile/Edge), arm a one-time user-gesture to resume playback
+          if (!played) {
+            const resumeOnGesture = async () => {
+              document.removeEventListener('touchstart', resumeOnGesture, {capture:true});
+              document.removeEventListener('click', resumeOnGesture, {capture:true});
+              try { await video.play(); } catch {}
+              // if scanning already true we'll just continue; else set and kick loop
+              if (!scanning) {
+                scanning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                setStatus('Camera running');
+                processFrame();
+              }
+            };
+            document.addEventListener('touchstart', resumeOnGesture, {capture:true, once:true});
+            document.addEventListener('click', resumeOnGesture, {capture:true, once:true});
+          }
+
           scanning = true;
           startBtn.disabled = true;
           stopBtn.disabled = false;
@@ -195,6 +230,12 @@ const ctx = canvas.getContext("2d", { willReadFrequently: true });
         startBtn.disabled = false;
         stopBtn.disabled = true;
         setStatus('Camera stopped');
+        // cleanup any pending gesture-resume listeners
+        try {
+          document.removeEventListener('touchstart', resumeOnGesture, {capture:true});
+          document.removeEventListener('click', resumeOnGesture, {capture:true});
+        } catch {}
+
       }
 
       startBtn.addEventListener('click', () => startCamera(true));
