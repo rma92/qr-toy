@@ -311,7 +311,7 @@ html, body{ margin:0;padding:0}
         const constraints = {
             audio: false,
             video: {
-              facingMode: deviceFacingMode || cameraSelector.value, // 'user' | 'environment'
+              facingMode: cameraSelector.value,
               width: { ideal: 1280 }, height: { ideal: 720 },
               advanced: [{ focusMode: 'continuous' }]
             }
