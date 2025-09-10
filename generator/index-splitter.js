@@ -534,16 +534,18 @@ function makeNextCode() {
   const qrG = computeQrForPayload(qStrG);
   const qrB = computeQrForPayload(qStrB);
 
-  // Render the composite
-  cachedLastQr = qrR; // keep something sensible for the HUD
-  renderRgbComposite(qrR, qrG, qrB);
+ // Render the composite (with optional inversion)
+ const invert = !!document.getElementById('bInvertRGB')?.checked;
+ cachedLastQr = qrR; // keep something sensible for the HUD
+ renderRgbComposite(qrR, qrG, qrB, invert);
 
   document.getElementById("pageDataOut").value =
     `${pR},${pG},${pB} out of ${chunks.length}`;
 
   // so next tick we continue after the 'B' frame
   pageid = pB;
-}//makeNextCode()
+}
+//makeNextCode()
 
 //helper function to split string into array.
 /*
@@ -721,7 +723,7 @@ function renderQr_modulesOnly(dCanvas, qr, scale, color, backgroundAlreadyDrawn 
   }
 }//modulesOnly
 
-function renderRgbComposite(qrR, qrG, qrB) {
+function renderRgbComposite(qrR, qrG, qrB, invert = false) {
   // scale & margins (keep consistent with your normal renderer)
   let scale = 2;
   const scaleEl = document.getElementById('scale');
@@ -737,43 +739,48 @@ function renderRgbComposite(qrR, qrG, qrB) {
   canvas.height = height;
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  // start with a white image
   const img = ctx.createImageData(width, height);
   const data = img.data;
+
+  // Initialize background:
+  // - normal (invert=false): white background
+  // - inverted (invert=true): black background
+  const bg = invert ? 0 : 255;
   for (let i = 0; i < data.length; i += 4) {
-    data[i  ] = 255; // R
-    data[i+1] = 255; // G
-    data[i+2] = 255; // B
+    data[i  ] = bg; // R
+    data[i+1] = bg; // G
+    data[i+2] = bg; // B
     data[i+3] = 255; // A
   }
 
-  // helper: darken channel c (0=R,1=G,2=B) for a scale x scale block
-  function darkenBlock(px, py, c) {
+  // Per-cell painter: set a single channel to either 0 (normal) or 255 (inverted)
+  function paintBlock(px, py, channelIndex) {
     const x0 = px * scale + offX;
     const y0 = py * scale + offY;
+    const val = invert ? 255 : 0; // light when inverted; dark otherwise
     for (let dy = 0; dy < scale; dy++) {
       let base = ((y0 + dy) * width + x0) * 4;
       for (let dx = 0; dx < scale; dx++, base += 4) {
-        data[base + c] = 0; // darken only that channel
+        data[base + channelIndex] = val;
       }
     }
   }
 
-  // walk modules once; apply per-channel darkening
+  // Walk modules once; apply per-channel painting
   for (let y = 0; y < n; y++) {
     const rowR = qrR.modules[y];
     const rowG = qrG.modules[y];
     const rowB = qrB.modules[y];
     for (let x = 0; x < n; x++) {
-      if (rowR[x]) darkenBlock(x, y, 0); // R channel
-      if (rowG[x]) darkenBlock(x, y, 1); // G channel
-      if (rowB[x]) darkenBlock(x, y, 2); // B channel
+      if (rowR[x]) paintBlock(x, y, 0); // R channel
+      if (rowG[x]) paintBlock(x, y, 1); // G channel
+      if (rowB[x]) paintBlock(x, y, 2); // B channel
     }
   }
 
   ctx.putImageData(img, 0, 0);
 }
-
+//renderRgbComposite
 
 function renderQr_graphicsCircle(dCanvas, qr, scale = 2, fillStyleWhite = "#ffffff", fillStyleBlack = "#000000", backgroundStyle = "#ffffff")
 {
