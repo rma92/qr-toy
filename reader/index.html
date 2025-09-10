@@ -68,6 +68,8 @@ html, body{ margin:0;padding:0}
         </td>
         <td>
           <label><input id="colorSweep" type="checkbox" checked>R→G→B→Gray</label>
+          <button id="startBtn">Start Camera</button>
+          <button id="stopBtn" disabled>Stop Camera</button>
         </td>
         <td>
           Mode:<br/>
@@ -86,7 +88,7 @@ html, body{ margin:0;padding:0}
         </td>
       </tr>
     </table>
-    <br /><br />
+        <span id="cameraStatus" style="font-size:0.9em;opacity:0.75;"></span>
 
     <canvas id="canvas" width="640" height="480"></canvas>
     <br /><br />
@@ -124,7 +126,80 @@ html, body{ margin:0;padding:0}
       const canvas = document.getElementById("canvas");
       const resultElement = document.getElementById("result");
 
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      // --- Performance: preallocate luminance buffer and a reusable WASM heap pointer ---
+      let luminanceBuffer = null; // Uint8Array(width*height)
+      let wasmLumPtr = 0;         // pointer in ZXing HEAPU8, sized to luminanceBuffer length
+      function ensureLumBuffers(w, h) {
+        const size = w * h;
+        if (!luminanceBuffer || luminanceBuffer.length !== size) {
+          luminanceBuffer = new Uint8Array(size);
+          if (zxing && wasmLumPtr) { zxing._free(wasmLumPtr); wasmLumPtr = 0; }
+          if (zxing) { wasmLumPtr = zxing._malloc(size); }
+        }
+      }
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      // --- Debounced processScanData (HotQR UI/table update) ---
+      let _psdTimer = 0;
+      function scheduleProcessScanData() {
+        if (typeof processScanData !== 'function') return;
+        if (_psdTimer) cancelAnimationFrame(_psdTimer);
+        _psdTimer = requestAnimationFrame(() => {
+          try { processScanData(); } catch (e) { console.warn('processScanData failed:', e); }
+        });
+      }
+
+      // --- Scanner control state ---
+      let scanning = false;
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn  = document.getElementById('stopBtn');
+      const cameraStatus = document.getElementById('cameraStatus');
+
+      function setStatus(msg) { if (cameraStatus) cameraStatus.textContent = msg || ''; }
+
+      async function startCamera(manual = false) {
+        if (scanning) return;
+        try {
+          // use current cameraSelector choice; fall back to default if none
+          const constraints = {
+            video: { facingMode: cameraSelector.value || 'environment' }
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          // play inside user gesture if manual; otherwise try/catch
+          try { await video.play(); } 
+          catch (e) { 
+            console.warn('video.play() blocked; waiting for user gesture.', e);
+            if (!manual) setStatus('Click "Start Camera" to begin'); 
+          }
+          scanning = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          setStatus('Camera running');
+          processFrame(); // kick loop
+        } catch (err) {
+          console.error('Camera start failed:', err);
+          setStatus('Camera error: ' + (err && err.name ? err.name : err));
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      }
+
+      function stopCamera() {
+        if (!scanning) return;
+        scanning = false;
+        if (stream) {
+          try { stream.getTracks().forEach(t => t.stop()); } catch {}
+          stream = null;
+        }
+        video.srcObject = null;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        setStatus('Camera stopped');
+      }
+
+      startBtn.addEventListener('click', () => startCamera(true));
+      stopBtn.addEventListener('click', stopCamera);
+
       const video = document.createElement("video");
       //var track;
 
@@ -157,50 +232,71 @@ html, body{ margin:0;padding:0}
       }
 
       // Make a filtered copy of RGBA pixels into a fresh Uint8ClampedArray
-      function makeFilteredBuffer(src, mode) {
-        const out = new Uint8ClampedArray(src.length);
-        for (let i = 0; i < src.length; i += 4) {
-          const r = src[i], g = src[i+1], b = src[i+2], a = src[i+3];
-          let R=r, G=g, B=b;
-          if (mode === 'red')     { G = 0; B = 0; }
-          else if (mode === 'green'){ R = 0; B = 0; }
-          else if (mode === 'blue') { R = 0; G = 0; }
-          else if (mode === 'gray') {
-            // Rec. 709 luma
-            const y = (0.2126*r + 0.7152*g + 0.0722*b) | 0;
-            R = G = B = y;
+      function makeFilteredBufferToLuminance(src, mode, w, h) {
+        // writes into luminanceBuffer (1 byte per pixel)
+        ensureLumBuffers(w, h);
+        const L = luminanceBuffer;
+        let j = 0;
+        if (mode === 'red') {
+          for (let i = 0; i < src.length; i += 4) L[j++] = src[i];
+        } else if (mode === 'green') {
+          for (let i = 0; i < src.length; i += 4) L[j++] = src[i+1];
+        } else if (mode === 'blue') {
+          for (let i = 0; i < src.length; i += 4) L[j++] = src[i+2];
+        } else if (mode === 'invert') {
+          for (let i = 0; i < src.length; i += 4) {
+            // integer Rec.709: (54R + 183G + 19B)>>8
+            L[j++] = 255 - ((54*src[i] + 183*src[i+1] + 19*src[i+2]) >> 8);
           }
-          out[i] = R; out[i+1] = G; out[i+2] = B; out[i+3] = a;
+        } else { // gray
+          for (let i = 0; i < src.length; i += 4) {
+            L[j++] = (54*src[i] + 183*src[i+1] + 19*src[i+2]) >> 8;
+          }
         }
-        return out;
+        return L;
       }
 
       // Try decoding the same frame with R-only, G-only, B-only, then Gray (first hit wins).
       function tryDecodeWithFilters(imageData, format, mode, sweepEnabled) {
-        // 1) If sweep is off: just try original (fast path)
+        // If sweep is off: just try original (fast path)
         if (!sweepEnabled) {
-          return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+          return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode, /*isLuminance=*/false);
         }
-        // 2) Sweep: red -> green -> blue -> gray
-        const order = ['red','green','blue','gray'];
+        // Compute per-channel contrast to order passes
+        const channels = ['red','green','blue'];
+        const contrasts = channels.map(ch => {
+          const buf = makeFilteredBufferToLuminance(imageData.data, ch, imageData.width, imageData.height);
+          let min=255, max=0;
+          for (let i=0;i<buf.length;i++){ const v=buf[i]; if (v<min) min=v; if (v>max) max=v; }
+          return {ch, c:max-min};
+        }).sort((a,b)=>b.c-a.c);
+        const order = contrasts.map(o=>o.ch).concat(['gray','invert']);
         for (const pass of order) {
-          const buf = makeFilteredBuffer(imageData.data, pass);
-          const res = readBarcodeFromCanvasInternal(buf, imageData.width, imageData.height, format, mode);
+          const lum = makeFilteredBufferToLuminance(imageData.data, pass, imageData.width, imageData.height);
+          if (!wasmLumPtr) ensureLumBuffers(imageData.width, imageData.height);
+          zxing.HEAPU8.set(lum, wasmLumPtr);
+          const res = zxing.readBarcodeFromPixmap(wasmLumPtr, imageData.width, imageData.height, 0, format);
           if (res && res.format && !res.error) return res;
         }
-        // 3) Fallback: original
-        return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+        // Fallback: original RGBA
+        return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode, /*isLuminance=*/false);
       }
 
       // Lower-level: copy a given RGBA buffer to ZXing heap and call into WASM once
-      function readBarcodeFromCanvasInternal(rgbaBuffer, imgWidth, imgHeight, format, mode) {
+      function readBarcodeFromCanvasInternal(rgbaBuffer, imgWidth, imgHeight, format, mode, isLuminance=false) {
         if (!zxing) return { error: "ZXing not yet initialized" };
-        const ptr = zxing._malloc(rgbaBuffer.byteLength);
-        try {
-          zxing.HEAPU8.set(rgbaBuffer, ptr);
-          return zxing.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, mode, format);
-        } finally {
-          zxing._free(ptr);
+        if (isLuminance) {
+          ensureLumBuffers(imgWidth, imgHeight);
+          zxing.HEAPU8.set(rgbaBuffer, wasmLumPtr);
+          return zxing.readBarcodeFromPixmap(wasmLumPtr, imgWidth, imgHeight, 0, format);
+        } else {
+          const ptr = zxing._malloc(rgbaBuffer.byteLength);
+          try {
+            zxing.HEAPU8.set(rgbaBuffer, ptr);
+            return zxing.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, mode, format);
+          } finally {
+            zxing._free(ptr);
+          }
         }
       }
 
@@ -227,27 +323,25 @@ html, body{ margin:0;padding:0}
         return htmlStr.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       }
 
-      const processFrame = function () {
+      let lastDecodeTime = 0;
+      const DECODE_INTERVAL = 100; // ~10fps decode cadence
+
+      const processFrame = function (now=performance.now()) {
+        if (!scanning) return;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const code = readBarcodeFromCanvas(canvas, format.value, mode.value === 'true');
-        if (code.format) {
-          //resultElement.innerText = code.format + ": " + escapeTags(code.text);
-          resultElement.innerText = code.text;
-
-          //HotQr    
-          //add the scan.
-          dScans[ code.text ] = '1';
-          szCachedLastScan = code.text;
-          processScanData();
-          //End HotQR.
-          drawResult(code)
-        } else {
-          resultElement.innerText = "No barcode found";
+        if (now - lastDecodeTime >= DECODE_INTERVAL) {
+          lastDecodeTime = now;
+          const code = readBarcodeFromCanvas(canvas, format.value, mode.value === 'true');
+          if (code && code.format) {
+            resultElement.innerText = code.text;
+            dScans[ code.text ] = '1';
+            szCachedLastScan = code.text;
+            scheduleProcessScanData();
+            drawResult(code);
+          }
         }
-        requestAnimationFrame(processFrame);
+        if (video.requestVideoFrameCallback) { video.requestVideoFrameCallback(processFrame); } else { requestAnimationFrame(processFrame); }
       };
-
 
       const updateVideoStream = async function (deviceId) {
         // To ensure the camera switch, it is advisable to free up the media resources
@@ -279,17 +373,19 @@ html, body{ margin:0;padding:0}
           console.warn("Focus control is not supported on this device.");
         }
         //end focus
-        video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
-        video.play();
-        processFrame();
+        video.setAttribute("playsinline", true); // iOS inline
+        const startPlayback = async () => {
+          try { await video.play(); } catch (e) { console.warn('video.play() was blocked or failed:', e); }
+          processFrame();
+        };
+        if (video.readyState >= 1) { startPlayback(); }
+        else { video.addEventListener('loadedmetadata', startPlayback, { once: true }); }
 
       };
 
-      cameraSelector.addEventListener("change", function () {
-        updateVideoStream(this.value);
-      });
+      cameraSelector.addEventListener("change", function () { stopCamera(); startCamera(true); });
 
-      updateVideoStream();
+      // updateVideoStream(); (disabled; use Start/Stop flow)
 
       /*
         Update foucs, called when the focus slider moves.
@@ -343,8 +439,21 @@ html, body{ margin:0;padding:0}
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(console.error);
       }
-      
-    </script>
+
+      // Helper: warn when not in a secure context (getUserMedia requires HTTPS or localhost)
+      if (!window.isSecureContext) {
+        console.warn('Not a secure context. Use https:// or http://localhost for camera access.');
+      }
+
+      // Attempt to auto-start camera when possible (works in production HTTPS and localhost).
+      document.addEventListener('DOMContentLoaded', () => {
+        if (window.isSecureContext || location.hostname === 'localhost') {
+          startCamera(false).catch(() => {
+            // ignore; user can click Start
+          });
+        }
+      });
+</script>
   </body>
 
 </html>

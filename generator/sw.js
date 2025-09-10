@@ -1,5 +1,5 @@
 // sw.js — place next to index.html
-const CACHE_NAME = 'hotqr-offline-20250908';
+const CACHE_NAME = 'hotqr-offline-20250909';
 
 // Only cache what the app actually uses:
 const APP_SHELL = [

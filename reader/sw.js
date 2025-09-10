@@ -1,5 +1,5 @@
 // sw.js — place next to index.html (use ./ paths if hosted in a subfolder)
-const CACHE_NAME = 'hotqr-scanner-20250908'; // bump on deploy
+const CACHE_NAME = 'hotqr-scanner-20250909'; // bump on deploy
 
 // Only cache what's actually used by the page:
 const APP_SHELL = [
