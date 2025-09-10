@@ -88,6 +88,12 @@ html, body{ margin:0;padding:0}
     </table>
     <br /><br />
 
+      <div style="margin: 8px 0; display:flex; gap:8px; align-items:center;">
+        <button id="startBtn">Start Camera</button>
+        <button id="stopBtn" disabled>Stop Camera</button>
+        <span id="cameraStatus" style="font-size:0.9em;opacity:0.75;"></span>
+      </div>
+
     <canvas id="canvas" width="640" height="480"></canvas>
     <br /><br />
     <div id="scanview" style="width:420px"></div>
@@ -125,6 +131,67 @@ html, body{ margin:0;padding:0}
       const resultElement = document.getElementById("result");
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      // Debounced processScanData
+      let _psdTimer = 0;
+      function scheduleProcessScanData() {
+        if (typeof processScanData !== 'function') return;
+        if (_psdTimer) cancelAnimationFrame(_psdTimer);
+        _psdTimer = requestAnimationFrame(() => { try { scheduleProcessScanData(); } catch (e) { console.warn('processScanData failed:', e); } });
+      }
+
+      // --- Scanner control state ---
+      let scanning = false;
+      let stream = null;
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn  = document.getElementById('stopBtn');
+      const cameraStatus = document.getElementById('cameraStatus');
+      function setStatus(msg) { if (cameraStatus) cameraStatus.textContent = msg || ''; }
+
+      async function startCamera(manual=false) {
+        // autoplay-friendly attributes
+        try {
+          video.setAttribute('playsinline','');
+          video.setAttribute('autoplay','');
+          video.setAttribute('muted','');
+          video.playsInline = true;
+          video.autoplay = true;
+          video.muted = true;
+        } catch {}
+        if (scanning) return;
+        try {
+          const constraints = { video: { facingMode: cameraSelector.value || 'environment' } };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          try { await video.play(); } catch (e) {
+            console.warn('video.play() blocked; tap Start.', e);
+            if (!manual) setStatus('Tap anywhere or press "Start Camera"');
+          }
+          scanning = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          setStatus('Camera running');
+          requestAnimationFrame(processFrame);
+        } catch (err) {
+          console.error('Camera start failed:', err);
+          setStatus('Camera error: ' + (err && err.name ? err.name : err));
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      }
+
+      function stopCamera() {
+        if (!scanning) return;
+        scanning = false;
+        if (stream) { try { stream.getTracks().forEach(t=>t.stop()); } catch {} stream = null; }
+        video.srcObject = null;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        setStatus('Camera stopped');
+      }
+
+      startBtn.addEventListener('click', () => startCamera(true));
+      stopBtn.addEventListener('click', stopCamera);
+
       const video = document.createElement("video");
       //var track;
 
@@ -239,7 +306,7 @@ html, body{ margin:0;padding:0}
           //add the scan.
           dScans[ code.text ] = '1';
           szCachedLastScan = code.text;
-          processScanData();
+          scheduleProcessScanData();
           //End HotQR.
           drawResult(code)
         } else {
@@ -344,7 +411,13 @@ html, body{ margin:0;padding:0}
         navigator.serviceWorker.register('./sw.js').catch(console.error);
       }
       
-    </script>
+    
+      document.addEventListener('DOMContentLoaded', () => {
+        if (window.isSecureContext || location.hostname === 'localhost') {
+          startCamera(false).catch(() => {});
+        }
+      });
+</script>
   </body>
 
 </html>
