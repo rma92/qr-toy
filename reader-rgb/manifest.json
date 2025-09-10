@@ -1,0 +1,13 @@
+{
+  "name": "HotQR Scanner",
+  "short_name": "HotQRScanner",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#44cd57",
+  "description": "HotQR Scanner",
+  "icons": [
+    {"src": "htqr_read.png", "sizes": "144x144", "type": "image/png"}
+  ]
+}

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>HotQR scanner</title>
+    <link rel="shortcut icon" href="#" />
+    <script src="zxing_reader.js"></script>
+    <script src="lzma_worker-min.js"></script>
+    <script src="hotqr_reader.js"></script>
+    <!--<script src="zxing_reader.unmin.js"></script>-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HotQR Scanner">
+    <link rel="apple-touch-icon" sizes="144x144" href="htqr_read.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json">
+<style>
+html, body{ margin:0;padding:0}
+#canvas {
+  width: 98vw; /* 100% of the viewport width */
+  padding:0;
+  margin:0;
+  max-width: 800px;
+  height: auto; /* maintain aspect ratio */
+  display: block;
+  border: 2px solid red;
+}
+
+</style>
+  </head>
+
+  <body style="text-align: center">
+    <table><tr>
+        <td>
+          Camera:<br/>
+          <select id="cameraSelector">
+            <option value="user">Front Camera</option>
+            <option value="environment">Back Camera</option>
+          </select>
+        </td>
+        <td>
+          Format:<br/>
+          <select id="format">
+            <option value="">Any</option>
+            <option value="Aztec">Aztec</option>
+            <option value="Code39">Codabar</option>
+            <option value="CODE_39">Code39</option>
+            <option value="Code93">Code93</option>
+            <option value="Code128">Code128</option>
+            <option value="DataMatrix">DataMatrix</option>
+            <option value="DataBar">DataBar</option>
+            <option value="DataBarExpanded">DataBarExpanded</option>
+            <option value="DataBarLimited">DataBarLimited</option>
+            <option value="DXFilmEdge">DXFilmEdge</option>
+            <option value="EAN8">EAN-8</option>
+            <option value="EAN13">EAN-13</option>
+            <option value="ITF">ITF</option>
+            <option value="PDF417">PDF417</option>
+            <option value="QRCode" selected>QRCode</option>
+            <option value="MicroQRCode">Micro QRCode</option>
+            <option value="RMQRCode">rMQR Code</option>
+            <option value="UPCA">UPC-A</option>
+            <option value="UPCE">UPC-E</option>
+            <option value="LinearCodes">Linear Codes</option>
+            <option value="MatrixCodes">Matrix Codes</option>
+          </select>
+        </td>
+        <td>
+          <label><input id="colorSweep" type="checkbox" checked>R→G→B→Gray</label>
+        </td>
+        <td>
+          Mode:<br/>
+          <select id="mode">
+            <option value="true" selected="">Normal</option>
+            <option value="false">Fast</option>
+          </select>
+        </td>
+        <td>
+          Focus:<br />
+          <input id="focusControl" type="range" min="0" max="100" value="50" />
+        </td>
+        <td>
+          Info:<br/>
+          <input id="inputTextOut" />
+        </td>
+      </tr>
+    </table>
+    <br /><br />
+
+    <canvas id="canvas" width="640" height="480"></canvas>
+<!-- Add this strip under the main canvas -->
+<div id="rgb-previews" style="display:none; margin:8px auto; max-width:800px;">
+  <canvas id="prev-red"   width="160" height="120" style="margin:0 4px; border:1px solid #aaa;"></canvas>
+  <canvas id="prev-green" width="160" height="120" style="margin:0 4px; border:1px solid #aaa;"></canvas>
+  <canvas id="prev-blue"  width="160" height="120" style="margin:0 4px; border:1px solid #aaa;"></canvas>
+</div>
+    
+    <br /><br />
+    <div id="scanview" style="width:420px"></div>
+
+    <div id="result"></div>
+
+    <div id="file-links"></div>
+    <div id="qr-reader-results"></div>
+    <script>
+      function isPhone() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      }
+
+      //if iPhone:
+      if (isPhone())
+      {
+        document.getElementById('cameraSelector').value = "environment";
+      }
+      else
+      {
+        document.getElementById('cameraSelector').value = "user"; // front camera
+      }
+
+    </script>
+    <script>
+      var zxing = ZXing().then(function (instance) {
+        zxing = instance; // this line is supposedly not required but with current emsdk it is :-/
+      });
+      
+      const cameraSelector = document.getElementById("cameraSelector");
+      const focusControl = document.getElementById("focusControl");      
+      const format = document.getElementById("format");
+      const mode = document.getElementById("mode");
+      const canvas = document.getElementById("canvas");
+      const resultElement = document.getElementById("result");
+
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const video = document.createElement("video");
+      //var track;
+
+      video.setAttribute("id", "video");
+      video.setAttribute("width", canvas.width);
+      video.setAttribute("height", canvas.height);
+      video.setAttribute("autoplay", "");
+
+      let stream;
+
+      function readBarcodeFromCanvas(canvas, format, mode) {
+        const imgWidth = canvas.width, imgHeight = canvas.height;
+        const imageData = canvas.getContext('2d').getImageData(0, 0, imgWidth, imgHeight);
+        const sweep = document.getElementById('colorSweep')?.checked;
+        return tryDecodeWithFiltersAll(imageData, format, mode, !!sweep);
+      }
+
+      // Make a filtered copy of RGBA pixels into a fresh Uint8ClampedArray
+      function makeFilteredBuffer(src, mode) {
+        const out = new Uint8ClampedArray(src.length);
+        for (let i = 0; i < src.length; i += 4) {
+          const r = src[i], g = src[i+1], b = src[i+2], a = src[i+3];
+          let R=r, G=g, B=b;
+          if (mode === 'red')     { G = 0; B = 0; }
+          else if (mode === 'green'){ R = 0; B = 0; }
+          else if (mode === 'blue') { R = 0; G = 0; }
+          else if (mode === 'gray') {
+            // Rec. 709 luma
+            const y = (0.2126*r + 0.7152*g + 0.0722*b) | 0;
+            R = G = B = y;
+          }
+          out[i] = R; out[i+1] = G; out[i+2] = B; out[i+3] = a;
+        }
+        return out;
+      }
+
+      // Replace tryDecodeWithFilters(...) in index.html with this:
+      function tryDecodeWithFiltersAll(imageData, format, mode, sweepEnabled) {
+        const results = [];
+        const seen = new Set();
+
+        // Helper to add a result if it’s new
+        const pushIfNew = (res) => {
+          if (res && res.format && !res.error && res.text && !seen.has(res.text)) {
+            seen.add(res.text);
+            results.push(res);
+          }
+        };
+
+        if (!sweepEnabled) {
+          pushIfNew(readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode));
+          return results;
+        }
+
+        // red → green → blue → gray
+        const order = ['red','green','blue','gray'];
+        for (const pass of order) {
+          const buf = makeFilteredBuffer(imageData.data, pass);
+          pushIfNew(readBarcodeFromCanvasInternal(buf, imageData.width, imageData.height, format, mode));
+        }
+
+        // Optional: also try original pixels last
+        pushIfNew(readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode));
+        return results;
+      }
+      
+      /*
+      // Try decoding the same frame with R-only, G-only, B-only, then Gray (first hit wins).
+      function tryDecodeWithFilters(imageData, format, mode, sweepEnabled) {
+        // 1) If sweep is off: just try original (fast path)
+        if (!sweepEnabled) {
+          return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+        }
+        // 2) Sweep: red -> green -> blue -> gray
+        const order = ['red','green','blue','gray'];
+        for (const pass of order) {
+          const buf = makeFilteredBuffer(imageData.data, pass);
+          const res = readBarcodeFromCanvasInternal(buf, imageData.width, imageData.height, format, mode);
+          if (res && res.format && !res.error) return res;
+        }
+        // 3) Fallback: original
+        return readBarcodeFromCanvasInternal(imageData.data, imageData.width, imageData.height, format, mode);
+      }
+      */
+
+      // Put this near your other helpers in index.html
+      const wasmHeapCache = { ptr: 0, bytes: 0 };
+      function readBarcodeFromCanvasInternal(rgbaBuffer, imgWidth, imgHeight, format, mode) {
+        if (!zxing) return { error: "ZXing not yet initialized" };
+
+        // Allocate once per frame-size and reuse
+        const needBytes = rgbaBuffer.byteLength;
+        if (wasmHeapCache.bytes !== needBytes) {
+          if (wasmHeapCache.ptr) zxing._free(wasmHeapCache.ptr);
+          wasmHeapCache.ptr = zxing._malloc(needBytes);
+          wasmHeapCache.bytes = needBytes;
+        }
+
+        zxing.HEAPU8.set(rgbaBuffer, wasmHeapCache.ptr);
+        return zxing.readBarcodeFromPixmap(wasmHeapCache.ptr, imgWidth, imgHeight, mode, format);
+      }
+      
+      /*
+      // Lower-level: copy a given RGBA buffer to ZXing heap and call into WASM once
+      function readBarcodeFromCanvasInternal(rgbaBuffer, imgWidth, imgHeight, format, mode) {
+        if (!zxing) return { error: "ZXing not yet initialized" };
+        const ptr = zxing._malloc(rgbaBuffer.byteLength);
+        try {
+          zxing.HEAPU8.set(rgbaBuffer, ptr);
+          return zxing.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, mode, format);
+        } finally {
+          zxing._free(ptr);
+        }
+      }*/
+
+      function drawResult(code) {
+        ctx.beginPath();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "red";
+        // ctx.textAlign = "center";
+        // ctx.fillStyle = "#green"
+        // ctx.font = "25px Arial";
+        // ctx.fontWeight = "bold";
+        with (code.position) {
+          ctx.moveTo(topLeft.x, topLeft.y);
+          ctx.lineTo(topRight.x, topRight.y);
+          ctx.lineTo(bottomRight.x, bottomRight.y);
+          ctx.lineTo(bottomLeft.x, bottomLeft.y);
+          ctx.lineTo(topLeft.x, topLeft.y);
+          ctx.stroke();
+          // ctx.fillText(code.text, (topLeft.x + bottomRight.x) / 2, (topLeft.y + bottomRight.y) / 2);
+        }
+      }
+
+      const processFrame = function () {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Grab pixels once (reuse for both decode + previews)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        updateRgbPreviews(imageData);
+
+        const codes = readBarcodeFromCanvas(canvas, format.value, mode.value === 'true');
+        if (codes.length) {
+          // Show last one in the text box, but process all
+          resultElement.innerText = codes[codes.length - 1].text;
+
+          for (const code of codes) {
+            // HotQR bookkeeping
+            dScans[code.text] = '1';
+            szCachedLastScan = code.text;
+            processScanData();
+
+            // Outline each detection
+            drawResult(code);
+          }
+        } else {
+          resultElement.innerText = "No barcode found";
+        }
+        requestAnimationFrame(processFrame);
+      };
+
+
+
+      const updateVideoStream = async function (deviceId) {
+        // To ensure the camera switch, it is advisable to free up the media resources
+        if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+
+        /*
+          //replaced for Autofocus
+        const constraints = {
+          video: {
+            facingMode: cameraSelector.value,
+            focusMode: "manual"
+          },
+        };
+        */
+        const constraints = {
+            audio: false,
+            video: {
+              facingMode: deviceFacingMode || cameraSelector.value, // 'user' | 'environment'
+              width: { ideal: 1280 }, height: { ideal: 720 },
+              advanced: [{ focusMode: 'continuous' }]
+            }
+          };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        focusControl.oninput = async () => {
+          try {
+            const v = Number(focusControl.value)/100;
+            await track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: v }] });
+          } catch { /* ignore if unsupported */ }
+        };
+
+        //check if focus control is supported
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+        if (capabilities.focusDistance) {
+          focusControl.disabled = false;
+          focusControl.min = capabilities.focusDistance.min;
+          focusControl.max = capabilities.focusDistance.max;
+          focusControl.step = capabilities.focusDistance.step || 1;
+
+          // Set initial focus
+          updateFocus(focusControl.value);
+        } else {
+          focusControl.disabled = true;
+          console.warn("Focus control is not supported on this device.");
+        }
+        //end focus
+        video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
+        video.play();
+        processFrame();
+
+      };
+
+      cameraSelector.addEventListener("change", function () {
+        updateVideoStream(this.value);
+      });
+
+      updateVideoStream();
+
+      /*
+        Update foucs, called when the focus slider moves.
+      */
+      function updateFocus(value) {
+        const track = stream.getVideoTracks()[0];
+        //console.log(track);
+        track.applyConstraints({
+          advanced: [{ focusDistance: value }],
+        });
+      }
+
+      // Function to populate cameraSelector with available video devices
+      async function populateCameraSelector() {
+        const cameraSelector = document.getElementById("cameraSelector");
+        
+        // Clear any existing options
+        cameraSelector.innerHTML = "";
+
+        try {
+          // Get the list of media devices
+          const devices = await navigator.mediaDevices.enumerateDevices();
+
+          let cameraCount = 0;
+
+          // Loop through devices and add only video input devices
+          devices.forEach(device => {
+            if (device.kind === 'videoinput') {
+              const option = document.createElement("option");
+              option.value = device.deviceId;
+              option.text = device.label || `Camera ${++cameraCount}`;
+              cameraSelector.appendChild(option);
+            }
+          });
+
+          if (cameraSelector.options.length === 0) {
+            const noCameraOption = document.createElement("option");
+            noCameraOption.value = "";
+            noCameraOption.text = "No cameras found";
+            cameraSelector.appendChild(noCameraOption);
+          }
+        } catch (error) {
+          console.error("Error accessing media devices:", error);
+          const errorOption = document.createElement("option");
+          errorOption.value = "";
+          errorOption.text = "Error accessing cameras";
+          cameraSelector.appendChild(errorOption);
+        }
+      }
+       
+      if ('serviceWorker' in navigator) {
+//        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      }
+      
+    function updateRgbPreviews(imageData) {
+      const box = document.getElementById('rgb-previews');
+      const enabled = document.getElementById('colorSweep')?.checked;
+      box.style.display = enabled ? 'block' : 'none';
+      if (!enabled) return;
+
+      const passes = [
+        { id: 'prev-red',   mode: 'red'   },
+        { id: 'prev-green', mode: 'green' },
+        { id: 'prev-blue',  mode: 'blue'  },
+      ];
+
+      for (const p of passes) {
+        const buf = makeFilteredBuffer(imageData.data, p.mode);
+        // Create an ImageData from the filtered buffer (no resizing—previews are small anyway)
+        const id = new ImageData(new Uint8ClampedArray(buf), imageData.width, imageData.height);
+        const cvs = document.getElementById(p.id);
+        const cctx = cvs.getContext('2d', { willReadFrequently: true });
+        // Fit the big frame into the small preview canvas
+        cctx.clearRect(0, 0, cvs.width, cvs.height);
+        // PutImageData at native size into an offscreen, then drawImage to scale:
+        // For speed & simplicity: draw scaled straight from the main canvas using our filter
+        const tmp = new OffscreenCanvas(imageData.width, imageData.height);
+        const tctx = tmp.getContext('2d');
+        tctx.putImageData(id, 0, 0);
+        cctx.drawImage(tmp, 0, 0, cvs.width, cvs.height);
+      }
+    }
+      
+    </script>
+  </body>
+
+</html>
