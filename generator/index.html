@@ -11,8 +11,7 @@
     <script type="text/javascript" src="qrcodegen-v1.8.0-es6.min.js"></script>
     <style>
 #qrcode
-  {
-  border: 20px solid white;
+{
 }
 #tab2
   {
@@ -38,6 +37,21 @@
 {
   width: 80px;
 }
+#szFilename
+{
+  width: 80px;
+}
+button
+{
+  font-size:12px;
+}
+body
+{
+  font-size:12px
+}
+#fileInput {
+  width: 90px; /* will still show a tiny part of filename */
+}
     </style>
   </head>
   <body>
@@ -45,7 +59,10 @@
       <button id=buttomImageMode>Image</button>
       <button id=buttonTextMode>Text</button>
       <button id=buttonToggleDebug>Debug</button>
-      <button id=buttonToggleControls>Toolbar Toggle</button>
+      <button id=buttonToggleControls>Toolbar</button>
+      <button id=buttonClear>Clear</button>
+      <button id=buttonWifi>Wifi</button>
+      <button id=buttonPaste>Paste</button>
     </div>
     <div id=controlBox>
     <textarea id="text" style="width:80%">HTTP://RM.VG/</textarea><br />
@@ -62,21 +79,15 @@
             <option value="qr2">qr (barcode.js)</option>
           </select>
         </td>
+        <th colspan=3>Load File</th>
       </tr>
       <tr>
-        <th colspan=4>Load File</th>
-      </tr>
-      <tr>
-        <td>
-          File:<br/>
+        <td colspan=4 style="border-top: 1px solid black">
+          <!--File:<br/>-->
           <input type="file" id="fileInput">          
-        </td>
-        <td>
-          <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64<br/>
-          <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10<br/>
+          <input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"/>Base64
+          <input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked/>Base10
           <input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"/>Raw
-        </td>
-        <td>
           <input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked /> LZMA (file)
           <span id="fileSizeOut">(filesize)</span>
         </td>
@@ -85,17 +96,17 @@
         <td>
           <label style="display:block;margin-top:.5rem">
             <input type="checkbox" id="bRgbOverlay">
-            RGB overlay (file mode only)
+            RGB <!--overlay file mode only)-->
           </label>
           <label style="display:block;margin-top:.25rem">
             <input type="checkbox" id="bInvertRGB">
-            Invert RGB overlay (modules become light on dark)
+            Invert<!--RGB overlay(modules become light on dark)-->
           </label>
         </td>
         <td>
           Filename:
           <br/>
-          <input id="szFilename" value="out.txt" />
+          <input id="szFilename" value="out.txt"/>
         </td>
         <td>
           Split Size:
@@ -103,7 +114,7 @@
           <input id="split_size" type="number" value="0" min=0 max=8000 />
         </td>
         <td>
-          Split Time (ms):
+          Time (ms):
           <br/>
           <input id="split_time" type="number" value="130" min=1 max=10000 />
         </td>
@@ -112,10 +123,8 @@
       </tr>
       </tr>
     </table>
-    <table>
-      <tr>
-      </tr>
-      <tr><th colspan=4>QRcode</th></tr>
+    <table  style="border-top: 1px solid black">
+      <!--<tr><th colspan=4>QRcode</th></tr>-->
       <tr>
         <td>ECC Level:
           <br/>
@@ -166,11 +175,13 @@
         </td>
       </tr>
     </table>
+  <!--
     <table>
       <tr><th colspan=4>Preprocessor</th></tr>
     </table>
-    <table>
-      <tr><th colspan=4>Render</th></tr>
+  -->
+    <table style="border-top: 1px solid black">
+      <!--<tr><th colspan=4>Render</th></tr>-->
       <tr>
         <td>
           Renderer:<br/>
@@ -191,9 +202,8 @@
       </tr>
       <tr><td colspan=3 id="domExpandedRenderOptions"></td></tr>
     </table>
-    <hr/>
-    <table>
-      <tr><th colspan=4>Static Output</th></tr>
+    <table style="border-top: 1px solid black">
+      <!--      <tr><th colspan=4>Static Output</th></tr>-->
       <tr>
         <td>
           <button id=buttonToStaticPage>Make Static Page</button>
@@ -220,7 +230,7 @@
     </table>
     </div>
     <div id="tabbox">
-      <input id="pageDataOut" size="50"/> 
+      <input id="pageDataOut" size="30"/> 
       <div id=tab1>
         <canvas id="cOut" width="1200" height="1200" style="border:1px solid red;" visible="false">
         </canvas>

@@ -773,8 +773,20 @@ function renderRgbComposite(qrR, qrG, qrB, invert = false) {
     const rowB = qrB.modules[y];
     for (let x = 0; x < n; x++) {
       if (rowR[x]) paintBlock(x, y, 0); // R channel
-      if (rowG[x]) paintBlock(x, y, 1); // G channel
-      if (rowB[x]) paintBlock(x, y, 2); // B channel
+      try
+      {
+        if (rowG[x]) paintBlock(x, y, 1); // G channel
+      }catch(ex)
+      {
+
+      }
+      try
+      {
+        if (rowB[x]) paintBlock(x, y, 2); // B channel
+      }
+      catch(ex)
+      {
+      }
     }
   }
 
@@ -1261,6 +1273,44 @@ document.getElementById('buttonToggleControls').addEventListener("click",functio
     }
     scaleCanvasOut();
   });
+document.getElementById('buttonClear').addEventListener("click",function()
+  {
+    document.getElementById('text').value = "";
+    ui_makeCode();
+    scaleCanvasOut();
+  });
+document.getElementById('buttonWifi').addEventListener("click",function()
+  {  
+    var s = [
+      "WIFI:S:ssid;T:WPA;P:password;;",
+      "WIFI:S:ssid;T:WPA;P:password;H:true;;"
+    ];
+
+    var out = document.getElementById('text');
+    var current = (out.value || "").replace(/\r\n/g, "\n").trim();
+    var idx = s.indexOf(current);
+    if( idx == -1 )
+    {
+      out.value = s[0];
+    }
+    var nextIdx = (idx === -1) ? 0 : (idx + 1) % s.length;
+    out.value = s[nextIdx];
+    ui_makeCode();
+    scaleCanvasOut();
+  });
+document.getElementById('buttonPaste').addEventListener("click", async function () {
+  try {
+    // Read text from clipboard
+    const text = await navigator.clipboard.readText();
+    // Replace textarea contents
+    document.getElementById('text').value = text;
+  } catch (err) {
+    console.error("Failed to read clipboard: ", err);
+    alert("Could not access clipboard. Make sure the page is served over HTTPS and you granted permissions.");
+  }
+    ui_makeCode();
+    scaleCanvasOut();
+});
 document.getElementById('bFit').addEventListener("change",function()
   {
 
