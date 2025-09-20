@@ -1133,6 +1133,77 @@ function ui_loadFileToInput()
   }
 }
 
+// Process an image blob (e.g., from clipboard) as if it were a selected file.
+async function processClipboardImageBlob(blob, suggestedName = 'pasted.png') {
+  // Use File so we can keep a sensible filename in the UI
+  const file = new File([blob], suggestedName, { type: blob.type || 'image/png' });
+
+  // Mirror the logic in ui_loadFileToInput()
+  const reader = new FileReader();
+  document.getElementById('szFilename').value = file.name;
+
+  bLzma = document.getElementById('lzmaEnable').checked;
+
+  reader.onload = function () {
+    const encodingType = document.querySelector('input[name="encodeAs"]:checked').value;
+
+    let fileContents = new Uint8Array(reader.result);
+    if (bQrSplitterDebug) console.log(fileContents);
+
+    // Set raw size
+    cachedFileContentsRaw = fileContents;
+    document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength;
+
+    // Optional LZMA
+    if (bLzma) {
+      fileContents = new Uint8Array(LZMA.compress(new Uint8Array(fileContents), 9));
+      if (bQrSplitterDebug) console.log(fileContents);
+      document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength;
+    }
+
+    cachedFileContents = fileContents;
+
+    // Encode using the same branches as the file picker
+    let encoded;
+    if (encodingType === 'base64') {
+      // apply the same UI defaults you use in the file path, if desired
+      if ([0,410,1400,1100].includes(+document.getElementById("split_size").value)) {
+        document.getElementById("split_size").value = 410;
+        document.getElementById("eccLevel").value = 'L';
+        document.getElementById("iMinVersion").value = 17;
+        document.getElementById("scale").value = 9;
+      }
+      encoded = _arrayBufferToBase64(fileContents);
+    } else if (encodingType === 'base10') {
+      // Your existing Base10 tuning
+      if ([0,410,1100,1400].includes(+document.getElementById("split_size").value)) {
+        if (window.innerWidth < 500) {
+          document.getElementById("split_size").value = 1100;
+          document.getElementById("eccLevel").value = 'L';
+          document.getElementById("scale").value = 5;
+          document.getElementById("iMinVersion").value = 17;
+        } else {
+          document.getElementById("split_size").value = 6800;
+          document.getElementById("eccLevel").value = 'L';
+          document.getElementById("scale").value = 9;
+          document.getElementById("iMinVersion").value = 17;
+        }
+      }
+      encoded = b10encode(fileContents);
+    } else {
+      // Raw text (for non-binary content)
+      encoded = new TextDecoder("utf-8").decode(fileContents);
+    }
+
+    // Drop the encoded payload into the same input your app already uses
+    document.getElementById('text').value = encoded;
+    ui_makeCode();         // rebuild chunks/QRs
+    scaleCanvasOut();      // keep canvas sized nicely
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
 function makeStaticPage()
 {
   const popupWindow = window.open("", "popupWindow", "width=600,height=400");
@@ -1298,6 +1369,7 @@ document.getElementById('buttonWifi').addEventListener("click",function()
     ui_makeCode();
     scaleCanvasOut();
   });
+/*
 document.getElementById('buttonPaste').addEventListener("click", async function () {
   try {
     // Read text from clipboard
@@ -1310,7 +1382,35 @@ document.getElementById('buttonPaste').addEventListener("click", async function 
   }
     ui_makeCode();
     scaleCanvasOut();
+});*/
+document.getElementById('buttonPaste').addEventListener('click', async function () {
+  try {
+    // Prefer the async clipboard API for images (requires HTTPS / localhost + permission)
+    if (navigator.clipboard && navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith('image/'));
+        if (imgType) {
+          const blob = await item.getType(imgType);
+          const ext = (imgType.split('/')[1] || 'png').replace('+xml','');
+          const name = `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
+          await processClipboardImageBlob(blob, name);
+          return; // done
+        }
+      }
+    }
+
+    // Fallback: plain text
+    const text = await navigator.clipboard.readText();
+    document.getElementById('text').value = text;
+    ui_makeCode();
+    scaleCanvasOut();
+  } catch (err) {
+    console.error("Failed to access clipboard:", err);
+    alert("Could not access the clipboard. Serve over HTTPS (or localhost) and allow clipboard permissions.");
+  }
 });
+
 document.getElementById('bFit').addEventListener("change",function()
   {
 
@@ -1321,6 +1421,23 @@ document.getElementById('lzmaEnable').addEventListener('change', ui_loadFileToIn
 document.querySelectorAll('input[name="encodeAs"]').forEach(radio => {
   radio.addEventListener('change', ui_loadFileToInput);
 });
+// Allow pasting with Ctrl+V anywhere on the page
+document.addEventListener('paste', async (e) => {
+  const items = e.clipboardData?.items || [];
+  for (const it of items) {
+    if (it.type && it.type.startsWith('image/')) {
+      const blob = it.getAsFile?.() || (await it.getType?.(it.type));
+      if (blob) {
+        e.preventDefault(); // don't dump a data URL into the textarea
+        const ext = (blob.type?.split('/')[1] || 'png').replace('+xml','');
+        await processClipboardImageBlob(blob, `pasted-${Date.now()}.${ext}`);
+      }
+      return;
+    }
+  }
+  // If no image is present, let default behavior proceed (e.g., text paste)
+});
+
 //atob( document.getElementById("text").value );
 // b10decode( document.getElementById("text").value );
 
