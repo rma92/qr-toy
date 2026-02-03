@@ -34,6 +34,10 @@ var cachedLZMAOut = "";
 var cachedDecode = "";
 var cachedArrayBuffer = "";
 
+// Debouncing for UI updates
+var processScanDataTimeout = null;
+var pendingProcessing = false;
+
 /*
  * Resets the stored data
  */
@@ -81,23 +85,6 @@ function b10decode(s)
   let hex = num.toString(16).padStart(decodedLength * 2, '0');
   let byteArray = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
   return byteArray;
-}
-
-function b10decodeChunks(chunkStrings)
-{
-  var arrays = new Array(chunkStrings.length);
-  var totalLength = 0;
-  for (var i = 0; i < chunkStrings.length; i++) {
-    arrays[i] = b10decode(chunkStrings[i]);
-    totalLength += arrays[i].length;
-  }
-  var out = new Uint8Array(totalLength);
-  var offset = 0;
-  for (var j = 0; j < arrays.length; j++) {
-    out.set(arrays[j], offset);
-    offset += arrays[j].length;
-  }
-  return out;
 }
 
 function b10decode_totext(s)
@@ -243,113 +230,176 @@ function downloadContentByCrc(szCrc) {
 }
 
 /*
+ * Debounced version of processScanData - prevents excessive UI updates
+ */
+function processScanDataDebounced()
+{
+  // Cancel any pending update
+  if (processScanDataTimeout) {
+    clearTimeout(processScanDataTimeout);
+  }
+
+  // Schedule update for 50ms from now
+  processScanDataTimeout = setTimeout(function() {
+    processScanData();
+    processScanDataTimeout = null;
+  }, 50);
+}
+
+/*
  * Analyze the scanned data.
  */
 function processScanData()
 {
-  var keys = Object.keys( dScans );
-  var resultContainer = document.getElementById('qr-reader-results');
-  processSingleScan(szCachedLastScan);
-  keys = keys.sort();
-  var szResultOut = "<table class=\"resultsTable\">";
-  for(var i = 0; i < keys.length; ++i )
-  {
-    szResultOut += "<tr><td><div class=\"tdScanPreview\">" + keys[i].replaceAll("\n", "<br/>") + "</div></td>";
-    szResultOut += "<td><button onClick=\"makePopupOfString( getScanContentsByKeyId(" + i + ").replaceAll('\\n','<br/>') );\">View</button></td></tr>";
+  // Prevent concurrent processing
+  if (pendingProcessing) return;
+  pendingProcessing = true;
 
-    //Sample string:
-    //"Q:3:10:15748754::Four score seven years ago"
-    //processSingleScan( keys[i] );
-  }
-  szResultOut += "</table>";
-  resultContainer.innerHTML = szResultOut;
-  //Create the table of CRCs
-  var knownCRCKeys = Object.keys( knownCRCScans );
-  var tableOut = "";
-  for(var i = 0; i < knownCRCKeys.length; ++i )
-  {
-    tableOut += "<table><tr><th colspan=10>" + knownCRCFilename[ knownCRCKeys[i] ] + "(" + knownCRCKeys[i] + ")</th></tr>";
-    for(var j = 0; j < knownCRCLength[ knownCRCKeys[i] ]; ++j )
-    {
-      if( knownCRCScans[ knownCRCKeys[i] ][ j ] != null )
+  // Use requestAnimationFrame to avoid blocking
+  requestAnimationFrame(function() {
+    try {
+      var keys = Object.keys( dScans );
+      var resultContainer = document.getElementById('qr-reader-results');
+      processSingleScan(szCachedLastScan);
+      keys = keys.sort();
+
+      // Use array join instead of string concatenation for better performance
+      var rows = ["<table class=\"resultsTable\">"];
+      for(var i = 0; i < keys.length; ++i )
       {
-        if( knownCRCKeys[i] == szCachedLastScanCRC && j == iCachedLastScanID )
+        rows.push("<tr><td><div class=\"tdScanPreview\">" + keys[i].replaceAll("\n", "<br/>") + "</div></td>");
+        rows.push("<td><button onClick=\"makePopupOfString( getScanContentsByKeyId(" + i + ").replaceAll('\\n','<br/>') );\">View</button></td></tr>");
+      }
+      rows.push("</table>");
+      resultContainer.innerHTML = rows.join("");
+
+      //Create the table of CRCs - use array for better performance
+      var knownCRCKeys = Object.keys( knownCRCScans );
+      var tableParts = [];
+      for(var i = 0; i < knownCRCKeys.length; ++i )
+      {
+        tableParts.push("<table><tr><th colspan=10>" + knownCRCFilename[ knownCRCKeys[i] ] + "(" + knownCRCKeys[i] + ")</th></tr>");
+        for(var j = 0; j < knownCRCLength[ knownCRCKeys[i] ]; ++j )
         {
-
-          tableOut += "<td bgcolor=lime><b>" + j + "</b></td>";
+          if( knownCRCScans[ knownCRCKeys[i] ][ j ] != null )
+          {
+            if( knownCRCKeys[i] == szCachedLastScanCRC && j == iCachedLastScanID )
+            {
+              tableParts.push("<td bgcolor=lime><b>" + j + "</b></td>");
+            }
+            else
+            {
+              tableParts.push("<td bgcolor=lime>" + j + "</td>");
+            }
+          }
+          else
+          {
+            tableParts.push("<td bgcolor=red>" + j + "</td>");
+          }
+          if( j % 10 == 9 )
+          {
+            tableParts.push("</tr><tr>");
+          }
         }
-        else
+
+        tableParts.push("</tr></table>");
+      }
+      document.getElementById("scanview").innerHTML = tableParts.join("");
+
+      //check if any Crcs are fully ready.
+      knownCRCLengthKeys = Object.keys(knownCRCLength);
+      for(var i = 0; i < knownCRCLengthKeys.length; ++i )
+      {
+        var currentCrc = knownCRCLengthKeys[i];
+        if( knownCRCScans[ currentCrc ] == null || finishedFiles[ currentCrc ] != null )
         {
-          tableOut += "<td bgcolor=lime>" + j + "</td>";
+          continue;
+        }
+        var currentCrcScanKeys = Object.keys(knownCRCScans[currentCrc])
+        if( currentCrcScanKeys.length >= knownCRCLength[ currentCrc ] )
+        {
+          document.getElementById("inputTextOut").value = currentCrc + " is assembling...";
+
+          // Use array join instead of string concatenation for better performance
+          var parts = [];
+          for(var j = 0; j < currentCrcScanKeys.length; ++j )
+          {
+            parts.push(knownCRCScans[currentCrc][ currentCrcScanKeys[j] ]);
+          }
+          var outString = parts.join("");
+          if( bDebug )
+          {
+            console.log( "data:text/plain;base64," +
+            btoa(unescape(encodeURIComponent(outString ))) );
+          }
+          finishedFiles[ currentCrc ] = outString;
+
+          // Process file decoding asynchronously to avoid blocking UI
+          processFileDecoding(currentCrc, outString);
         }
       }
-      else
-      {
-        tableOut += "<td bgcolor=red>" + j + "</td>";
-      }
-      if( j % 10 == 9 )
-      {
-        tableOut += "</tr><tr>";
-      }
+    } finally {
+      pendingProcessing = false;
     }
+  });
+}//process scan data
 
-    tableOut += "</tr></table>";
-  }
-  document.getElementById("scanview").innerHTML = tableOut;
-  //check if any Crcs are fully ready.
-  knownCRCLengthKeys = Object.keys(knownCRCLength);
-  for(var i = 0; i < knownCRCLengthKeys.length; ++i )
-  {
-    var currentCrc = knownCRCLengthKeys[i];
-    if( knownCRCScans[ currentCrc ] == null || finishedFiles[ currentCrc ] != null )
-    {
-      continue;
-    }
-    var currentCrcScanKeys = Object.keys(knownCRCScans[currentCrc])
-    if( currentCrcScanKeys.length >= knownCRCLength[ currentCrc ] )
-    {
-      var outString = "";
-      var chunkStrings = new Array(knownCRCLength[currentCrc]);
-      document.getElementById("inputTextOut").value = currentCrc + " is done";
-      for (var j = 0; j < knownCRCLength[currentCrc]; ++j)
-      {
-        chunkStrings[j] = knownCRCScans[currentCrc][j];
-      }
-      var encoding = knownCRCEncoding[ currentCrc ];
-      if (encoding !== 'B10C' && encoding !== 'LB1C') {
-        outString = chunkStrings.join("");
-      }
-      if( bDebug )
-      {
-        console.log( "data:text/plain;base64," + 
-        btoa(unescape(encodeURIComponent(outString ))) );
-      }
-      finishedFiles[ currentCrc ] = outString;
+/*
+ * Process file decoding asynchronously to avoid blocking the UI
+ */
+function processFileDecoding(currentCrc, outString)
+{
+  document.getElementById("inputTextOut").value = currentCrc + " is decoding...";
+
+  // Defer processing to next tick
+  setTimeout(function() {
+    try {
       //parse the file.
       //new TextDecoder("Latin1").decode( new Uint8Array( finishedFilesArrayBuffer[1021043213] ) );
-      if( encoding == 'LB1' )
+      if( knownCRCEncoding[ currentCrc ] == 'LB1' )
       {
         cachedOutString = outString;
-        cachedB10Decode = b10decode( outString );
-        cachedLZMAOut = LZMA.decompress( cachedB10Decode );
-        //cachedDecode = new TextDecoder("Latin1").decode( new Uint8Array( cachedLZMAOut ) );
-        //cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+
+        // Base10 decode
+        document.getElementById("inputTextOut").value = currentCrc + " is decoding base10...";
+        setTimeout(function() {
+          try {
+            cachedB10Decode = b10decode( outString );
+
+            // LZMA decompress
+            document.getElementById("inputTextOut").value = currentCrc + " is decompressing...";
+            setTimeout(function() {
+              try {
+                cachedLZMAOut = LZMA.decompress( cachedB10Decode );
+                finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+                document.getElementById("inputTextOut").value = currentCrc + " is done";
+                update_file_download_links();
+              } catch(ex) {
+                console.error("LZMA decompression failed:", ex);
+                document.getElementById("inputTextOut").value = currentCrc + " decompression failed!";
+              }
+            }, 10);
+          } catch(ex) {
+            console.error("Base10 decode failed:", ex);
+            document.getElementById("inputTextOut").value = currentCrc + " decode failed!";
+          }
+        }, 10);
       }
-      else if( encoding == 'LB1C' )
+      else if( knownCRCEncoding[ currentCrc ] == 'B10' )
       {
-        cachedLZMAOut = LZMA.decompress( b10decodeChunks(chunkStrings) );
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+        document.getElementById("inputTextOut").value = currentCrc + " is decoding base10...";
+        setTimeout(function() {
+          try {
+            finishedFilesArrayBuffer[ currentCrc ] = b10decode( outString );
+            document.getElementById("inputTextOut").value = currentCrc + " is done";
+            update_file_download_links();
+          } catch(ex) {
+            console.error("Base10 decode failed:", ex);
+            document.getElementById("inputTextOut").value = currentCrc + " decode failed!";
+          }
+        }, 10);
       }
-      else if( encoding == 'B10' )
-      {
-        finishedFilesArrayBuffer[ currentCrc ] = b10decode( outString );
-      }
-      else if( encoding == 'B10C' )
-      {
-        finishedFilesArrayBuffer[ currentCrc ] = b10decodeChunks(chunkStrings).buffer;
-      }
-      else if( encoding == 'LB6' )
+      else if( knownCRCEncoding[ currentCrc ] == 'LB6' )
       {
         const binaryString = atob(outString);
         var bytes = new Uint8Array( binaryString.length );
@@ -357,10 +407,21 @@ function processScanData()
         {
           bytes[i] = binaryString.charCodeAt(i);
         }
-        cachedLZMAOut = LZMA.decompress( bytes );
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+
+        document.getElementById("inputTextOut").value = currentCrc + " is decompressing...";
+        setTimeout(function() {
+          try {
+            cachedLZMAOut = LZMA.decompress( bytes );
+            finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+            document.getElementById("inputTextOut").value = currentCrc + " is done";
+            update_file_download_links();
+          } catch(ex) {
+            console.error("LZMA decompression failed:", ex);
+            document.getElementById("inputTextOut").value = currentCrc + " decompression failed!";
+          }
+        }, 10);
       }
-      else if( encoding == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
+      else if( knownCRCEncoding[ currentCrc ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
       {
         const binaryString = atob(outString);
         var bytes = new Uint8Array( binaryString.length );
@@ -368,17 +429,23 @@ function processScanData()
         {
           bytes[i] = binaryString.charCodeAt(i);
         }
-        
+
         finishedFilesArrayBuffer[ currentCrc ] = bytes.buffer;
+        document.getElementById("inputTextOut").value = currentCrc + " is done";
+        update_file_download_links();
       }
       else
       {
         finishedFilesArrayBuffer[ currentCrc ] = outString;
+        document.getElementById("inputTextOut").value = currentCrc + " is done";
+        update_file_download_links();
       } //if filetype
-      update_file_download_links();
+    } catch(ex) {
+      console.error("File decoding failed:", ex);
+      document.getElementById("inputTextOut").value = currentCrc + " processing failed!";
     }
-  }
-}//process can data
+  }, 10);
+}
 
 /**
  * Checks if a filename ends with a valid image extension.
@@ -580,3 +647,5 @@ function testShortScan()
   dScans[ s1 ] = 1;
   dScans[ s2 ] = 1;
 }
+
+

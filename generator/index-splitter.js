@@ -36,7 +36,6 @@ var bLzma = 0;
 var cachedLastQr = null;
 var cachedFileContents = null;
 var cachedFileContentsRaw = null;
-var bUseChunkedBase10 = false;
 
 /*
  * Scale the output canvas if the fit box is checked.
@@ -382,41 +381,12 @@ function b_crc32 (str) {
  */
 const B10CONV_DIGITS_PER_BYTE = Math.log10(Math.pow(2, 8));
 
-const HEX_TABLE = (function () {
-  var table = new Array(256);
-  for (var i = 0; i < 256; i++) {
-    table[i] = i.toString(16).padStart(2, '0');
-  }
-  return table;
-})();
-
-function bytesToHex(byteArray) {
-  var out = new Array(byteArray.length);
-  for (var i = 0; i < byteArray.length; i++) {
-    out[i] = HEX_TABLE[byteArray[i]];
-  }
-  return out.join('');
-}
-
 function b10encode( arrayBuffer ) {
   let byteArray = new Uint8Array(arrayBuffer);
-  let raw = BigInt('0x' + bytesToHex(byteArray)).toString();
+  let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
   let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
   let prefix = '0'.repeat(encodedLength - raw.length);
   return prefix + raw;
-}
-
-function b10encodeToChunks(byteArray, maxDigitsPerChunk) {
-  var bytesPerChunk = Math.max(1, Math.floor(maxDigitsPerChunk / B10CONV_DIGITS_PER_BYTE));
-  var out = [];
-  for (var offset = 0; offset < byteArray.length; offset += bytesPerChunk) {
-    var slice = byteArray.subarray(offset, offset + bytesPerChunk);
-    var raw = BigInt('0x' + bytesToHex(slice)).toString();
-    var encodedLength = Math.ceil(slice.length * B10CONV_DIGITS_PER_BYTE);
-    var prefix = '0'.repeat(encodedLength - raw.length);
-    out.push(prefix + raw);
-  }
-  return out;
 }
 
 function b10decode(s)
@@ -493,11 +463,7 @@ function buildQStrForPage(pageIndex) {
   if (encodingType === 'base64') {
     fileData = (bLzma) ? "LB6" : "B64";
   } else if (encodingType === 'base10') {
-    if (bUseChunkedBase10) {
-      fileData = (bLzma) ? "LB1C" : "B10C";
-    } else {
-      fileData = (bLzma) ? "LB1" : "B10";
-    }
+    fileData = (bLzma) ? "LB1" : "B10";
   }
 
   // same header you already use in makeCodeByChunkId()
@@ -525,11 +491,7 @@ function makeCodeByChunkId( pageid )
   }
   else if( encodingType === 'base10' )
   {
-    if (bUseChunkedBase10) {
-      fileData = (bLzma) ? "LB1C" : "B10C";
-    } else {
-      fileData = (bLzma) ? "LB1" : "B10";
-    }
+    fileData = (bLzma)?"LB1":"B10";
   }
 
   qStr = qStrPrefix + szHeaderSeparator + pageid + szHeaderSeparator + chunks.length + szHeaderSeparator + icrc32 + szHeaderSeparator + szFilename + szHeaderSeparator + fileData + szHeaderTerminator + chunks[pageid];
@@ -1077,20 +1039,7 @@ function makeCodeInt (qStr, codeMode = null)
 //Calls makecode in response to a UI change.
 function ui_makeCode()
 {
-  var encodingType = document.querySelector('input[name="encodeAs"]:checked')?.value;
-  var splitSize = parseInt(document.getElementById('split_size').value);
-  var fileInput = document.getElementById('fileInput');
-  var hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
-  if (encodingType === 'base10' && cachedFileContents && hasFile && splitSize === 0) {
-    bUseChunkedBase10 = false;
-    document.getElementById('text').value = b10encode(cachedFileContents);
-  }
-  if (bUseChunkedBase10 && encodingType === 'base10' && cachedFileContents && splitSize > 0 && hasFile) {
-    chunks = b10encodeToChunks(cachedFileContents, splitSize);
-    document.getElementById('text').value = "";
-  } else {
-    chunks = [];
-  }
+  chunks = [];
   makeCode();
 }
 
@@ -1106,6 +1055,10 @@ function ui_loadFileToInput()
     const reader = new FileReader();
     document.getElementById('szFilename').value = file.name;
     bLzma = document.getElementById('lzmaEnable').checked;
+
+    // Show loading indicator
+    document.getElementById("fileSizeOut").innerHTML = "Loading...";
+
     reader.onload = function(e)
     {
       let encoded;
@@ -1117,80 +1070,108 @@ function ui_loadFileToInput()
         console.log(fileContents);
       }
       cachedFileContentsRaw = fileContents;
-      document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength;
+      document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength + " bytes";
+
       if( bLzma )
       {
-        fileContents = new Uint8Array( LZMA.compress( new Uint8Array(fileContents), 9 ) );
-        if(bQrSplitterDebug) console.log(fileContents);
-        document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength;
+        // Use async LZMA compression to avoid blocking UI
+        document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength + " bytes (compressing...)";
+
+        // Defer to next tick to allow UI update
+        setTimeout(function() {
+          try {
+            fileContents = new Uint8Array( LZMA.compress( new Uint8Array(fileContents), 9 ) );
+            if(bQrSplitterDebug) console.log(fileContents);
+            document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes (compressed)";
+            cachedFileContents = fileContents;
+            continueFileProcessing(fileContents, encodingType);
+          } catch(ex) {
+            console.error("LZMA compression failed:", ex);
+            document.getElementById("fileSizeOut").innerHTML = "Compression failed!";
+          }
+        }, 10);
+        return; // Exit early, continue in timeout
       }
 
       cachedFileContents = fileContents;
+      continueFileProcessing(fileContents, encodingType);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
 
-      bUseChunkedBase10 = false;
-      if (encodingType === 'base64')
-      {
-        //if the split_size is a default, change ui settings for splitter
-        if( document.getElementById("split_size").value == 0
-        || document.getElementById("split_size").value == 410
-        || document.getElementById("split_size").value == 1400
-        || document.getElementById("split_size").value == 1100
-        )
-        {
-          document.getElementById("split_size").value = 410;
-          document.getElementById("eccLevel").value = 'L';
-          document.getElementById("iMinVersion").value = 17;
-          document.getElementById("scale").value = 9;
-        }
-        encoded = _arrayBufferToBase64( fileContents );
-      }
-      else if (encodingType === 'base10')
-      {
-        //in base 10 M correction, module size changes around: 
-        //400, 490, 580, 680, 760, 875, 966, 1100, 1237, 1400
-        //if the split_size is a default, change ui settings for splitter
-        if( document.getElementById("split_size").value == 0
-        || document.getElementById("split_size").value == 410
-        || document.getElementById("split_size").value == 1100
-        || document.getElementById("split_size").value == 1400
-        )
-        {
-          console.log("A");
-          if( window.innerWidth < 500 )
-          { //Phone
-            document.getElementById("split_size").value = 1100;
-            document.getElementById("eccLevel").value = 'L';
-            document.getElementById("scale").value = 5;
-            document.getElementById("iMinVersion").value = 17;            
-          }
-          else
-          {
-            document.getElementById("split_size").value = 6800;
-            document.getElementById("eccLevel").value = 'L';
-            document.getElementById("scale").value = 9;
-            document.getElementById("iMinVersion").value = 17;            
-          }
-        }
-        var splitSize = parseInt(document.getElementById("split_size").value);
-        if (splitSize > 0)
-        {
-          bUseChunkedBase10 = true;
-          encoded = "";
-        }
-        else
-        {
-          encoded = b10encode( fileContents );
-        }
+// Helper function to continue file processing after compression
+function continueFileProcessing(fileContents, encodingType)
+{
+  let encoded;
+
+  if (encodingType === 'base64')
+  {
+    //if the split_size is a default, change ui settings for splitter
+    if( document.getElementById("split_size").value == 0
+    || document.getElementById("split_size").value == 410
+    || document.getElementById("split_size").value == 1400
+    || document.getElementById("split_size").value == 1100
+    )
+    {
+      document.getElementById("split_size").value = 410;
+      document.getElementById("eccLevel").value = 'L';
+      document.getElementById("iMinVersion").value = 17;
+      document.getElementById("scale").value = 9;
+    }
+    encoded = _arrayBufferToBase64( fileContents );
+    document.getElementById('text').value = encoded;
+    ui_makeCode();
+  }
+  else if (encodingType === 'base10')
+  {
+    //in base 10 M correction, module size changes around:
+    //400, 490, 580, 680, 760, 875, 966, 1100, 1237, 1400
+    //if the split_size is a default, change ui settings for splitter
+    if( document.getElementById("split_size").value == 0
+    || document.getElementById("split_size").value == 410
+    || document.getElementById("split_size").value == 1100
+    || document.getElementById("split_size").value == 1400
+    )
+    {
+      console.log("A");
+      if( window.innerWidth < 500 )
+      { //Phone
+        document.getElementById("split_size").value = 1100;
+        document.getElementById("eccLevel").value = 'L';
+        document.getElementById("scale").value = 5;
+        document.getElementById("iMinVersion").value = 17;
       }
       else
       {
-        encoded = new TextDecoder("utf-8").decode( fileContents );
+        document.getElementById("split_size").value = 6800;
+        document.getElementById("eccLevel").value = 'L';
+        document.getElementById("scale").value = 9;
+        document.getElementById("iMinVersion").value = 17;
       }
-      //console.log( encoded );
-      document.getElementById('text').value = encoded;
-      ui_makeCode();
     }
-    reader.readAsArrayBuffer(file);
+
+    // Show encoding message
+    document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes (encoding base10...)";
+
+    // Use setTimeout to allow UI update before heavy BigInt operation
+    setTimeout(function() {
+      try {
+        encoded = b10encode( fileContents );
+        document.getElementById('text').value = encoded;
+        document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes";
+        ui_makeCode();
+      } catch(ex) {
+        console.error("Base10 encoding failed:", ex);
+        document.getElementById("fileSizeOut").innerHTML = "Encoding failed!";
+      }
+    }, 10);
+  }
+  else
+  {
+    encoded = new TextDecoder("utf-8").decode( fileContents );
+    document.getElementById('text').value = encoded;
+    ui_makeCode();
   }
 }
 
@@ -1213,63 +1194,89 @@ async function processClipboardImageBlob(blob, suggestedName = 'pasted.png') {
 
     // Set raw size
     cachedFileContentsRaw = fileContents;
-    document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength;
+    document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength + " bytes";
 
     // Optional LZMA
     if (bLzma) {
-      fileContents = new Uint8Array(LZMA.compress(new Uint8Array(fileContents), 9));
-      if (bQrSplitterDebug) console.log(fileContents);
-      document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength;
+      document.getElementById("fileSizeOut").innerHTML = cachedFileContentsRaw.byteLength + " bytes (compressing...)";
+
+      // Defer to next tick to avoid blocking
+      setTimeout(function() {
+        try {
+          fileContents = new Uint8Array(LZMA.compress(new Uint8Array(fileContents), 9));
+          if (bQrSplitterDebug) console.log(fileContents);
+          document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes (compressed)";
+          cachedFileContents = fileContents;
+          continueClipboardProcessing(fileContents, encodingType);
+        } catch(ex) {
+          console.error("LZMA compression failed:", ex);
+          document.getElementById("fileSizeOut").innerHTML = "Compression failed!";
+        }
+      }, 10);
+      return; // Exit early
     }
 
     cachedFileContents = fileContents;
-
-    // Encode using the same branches as the file picker
-    let encoded;
-    bUseChunkedBase10 = false;
-    if (encodingType === 'base64') {
-      // apply the same UI defaults you use in the file path, if desired
-      if ([0,410,1400,1100].includes(+document.getElementById("split_size").value)) {
-        document.getElementById("split_size").value = 410;
-        document.getElementById("eccLevel").value = 'L';
-        document.getElementById("iMinVersion").value = 17;
-        document.getElementById("scale").value = 9;
-      }
-      encoded = _arrayBufferToBase64(fileContents);
-    } else if (encodingType === 'base10') {
-      // Your existing Base10 tuning
-      if ([0,410,1100,1400].includes(+document.getElementById("split_size").value)) {
-        if (window.innerWidth < 500) {
-          document.getElementById("split_size").value = 1100;
-          document.getElementById("eccLevel").value = 'L';
-          document.getElementById("scale").value = 5;
-          document.getElementById("iMinVersion").value = 17;
-        } else {
-          document.getElementById("split_size").value = 6800;
-          document.getElementById("eccLevel").value = 'L';
-          document.getElementById("scale").value = 9;
-          document.getElementById("iMinVersion").value = 17;
-        }
-      }
-      var splitSize = parseInt(document.getElementById("split_size").value);
-      if (splitSize > 0) {
-        bUseChunkedBase10 = true;
-        encoded = "";
-      } else {
-        encoded = b10encode(fileContents);
-      }
-    } else {
-      // Raw text (for non-binary content)
-      encoded = new TextDecoder("utf-8").decode(fileContents);
-    }
-
-    // Drop the encoded payload into the same input your app already uses
-    document.getElementById('text').value = encoded;
-    ui_makeCode();         // rebuild chunks/QRs
-    scaleCanvasOut();      // keep canvas sized nicely
+    continueClipboardProcessing(fileContents, encodingType);
   };
 
   reader.readAsArrayBuffer(file);
+}
+
+// Helper function to continue clipboard processing after compression
+function continueClipboardProcessing(fileContents, encodingType) {
+  let encoded;
+
+  // Encode using the same branches as the file picker
+  if (encodingType === 'base64') {
+    // apply the same UI defaults you use in the file path, if desired
+    if ([0,410,1400,1100].includes(+document.getElementById("split_size").value)) {
+      document.getElementById("split_size").value = 410;
+      document.getElementById("eccLevel").value = 'L';
+      document.getElementById("iMinVersion").value = 17;
+      document.getElementById("scale").value = 9;
+    }
+    encoded = _arrayBufferToBase64(fileContents);
+    document.getElementById('text').value = encoded;
+    ui_makeCode();
+    scaleCanvasOut();
+  } else if (encodingType === 'base10') {
+    // Your existing Base10 tuning
+    if ([0,410,1100,1400].includes(+document.getElementById("split_size").value)) {
+      if (window.innerWidth < 500) {
+        document.getElementById("split_size").value = 1100;
+        document.getElementById("eccLevel").value = 'L';
+        document.getElementById("scale").value = 5;
+        document.getElementById("iMinVersion").value = 17;
+      } else {
+        document.getElementById("split_size").value = 6800;
+        document.getElementById("eccLevel").value = 'L';
+        document.getElementById("scale").value = 9;
+        document.getElementById("iMinVersion").value = 17;
+      }
+    }
+
+    // Defer base10 encoding to avoid blocking
+    document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes (encoding base10...)";
+    setTimeout(function() {
+      try {
+        encoded = b10encode(fileContents);
+        document.getElementById('text').value = encoded;
+        document.getElementById("fileSizeOut").innerHTML = fileContents.byteLength + " bytes";
+        ui_makeCode();
+        scaleCanvasOut();
+      } catch(ex) {
+        console.error("Base10 encoding failed:", ex);
+        document.getElementById("fileSizeOut").innerHTML = "Encoding failed!";
+      }
+    }, 10);
+  } else {
+    // Raw text (for non-binary content)
+    encoded = new TextDecoder("utf-8").decode(fileContents);
+    document.getElementById('text').value = encoded;
+    ui_makeCode();
+    scaleCanvasOut();
+  }
 }
 
 function makeStaticPage()
@@ -1508,3 +1515,4 @@ document.addEventListener('paste', async (e) => {
 
 //atob( document.getElementById("text").value );
 // b10decode( document.getElementById("text").value );
+

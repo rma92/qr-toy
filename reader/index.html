@@ -235,11 +235,11 @@ html, body{ margin:0;padding:0}
           //resultElement.innerText = code.format + ": " + escapeTags(code.text);
           resultElement.innerText = code.text;
 
-          //HotQr    
+          //HotQr
           //add the scan.
           dScans[ code.text ] = '1';
           szCachedLastScan = code.text;
-          processScanData();
+          processScanDataDebounced();
           //End HotQR.
           drawResult(code)
         } else {
