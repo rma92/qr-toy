@@ -23,6 +23,9 @@ var knownCRCFilename = {};
 var knownCRCEncoding = {};
 var finishedFiles = {};
 var finishedFilesArrayBuffer = {};
+var scanTableCache = {};
+var scanResultsCache = {};
+var pendingDecode = {};
 //caching of last scan info for viewer
 var szCachedLastScan = "";
 var iCachedLastScanID = 0;
@@ -42,6 +45,17 @@ function reset()
   knownCRCLength = {};
   knownCRCScans = {};
   dScans = {};
+  finishedFiles = {};
+  finishedFilesArrayBuffer = {};
+  scanTableCache = {};
+  scanResultsCache = {};
+  pendingDecode = {};
+  var scanView = document.getElementById("scanview");
+  if (scanView) scanView.innerHTML = "";
+  var results = document.getElementById("qr-reader-results");
+  if (results) results.innerHTML = "";
+  var fileLinks = document.getElementById("file-links");
+  if (fileLinks) fileLinks.innerHTML = "";
 }
 /*
  * Returns the CRC32 of str as a number.
@@ -153,7 +167,7 @@ function processSingleScan(szScan)
         var currentScan = aheaders[1];
         iCachedLastScanID = currentScan;
         szCachedLastScanCRC = crc;
-        var totalScansForThisCRC = aheaders[2];
+        var totalScansForThisCRC = parseInt(aheaders[2], 10);
 
         knownCRCLength[crc] = totalScansForThisCRC;
         if( knownCRCScans[crc] == null )
@@ -233,6 +247,102 @@ function arrayBufferToBlobUrl(arrayBuffer, mimeType) {
     return URL.createObjectURL(blob);
 }
 
+function normalizeDecodedResult(result) {
+  if (result instanceof Uint8Array) return result;
+  if (result instanceof ArrayBuffer) return new Uint8Array(result);
+  if (typeof result === "string") {
+    return new TextEncoder("utf-8").encode(result);
+  }
+  return result;
+}
+
+function updateDecodeHint(crc) {
+  var el = document.getElementById("decodeModeOut");
+  if (!el) return;
+  var encoding = knownCRCEncoding[crc];
+  if (encoding) {
+    el.textContent = "Decode: " + encoding;
+  }
+}
+
+function addScanResultRow(scanText) {
+  if (scanResultsCache[scanText]) return;
+  scanResultsCache[scanText] = true;
+  var resultContainer = document.getElementById('qr-reader-results');
+  if (!resultContainer) return;
+  var table = resultContainer.querySelector("table.resultsTable");
+  if (!table) {
+    table = document.createElement("table");
+    table.className = "resultsTable";
+    resultContainer.appendChild(table);
+  }
+  var row = document.createElement("tr");
+  var cellPreview = document.createElement("td");
+  var divPreview = document.createElement("div");
+  divPreview.className = "tdScanPreview";
+  divPreview.innerHTML = scanText.replaceAll("\n", "<br/>");
+  cellPreview.appendChild(divPreview);
+  row.appendChild(cellPreview);
+
+  var cellButton = document.createElement("td");
+  var button = document.createElement("button");
+  button.textContent = "View";
+  button.addEventListener("click", function () {
+    makePopupOfString(scanText.replaceAll("\n", "<br/>"));
+  });
+  cellButton.appendChild(button);
+  row.appendChild(cellButton);
+  table.appendChild(row);
+}
+
+function ensureCrcTable(crc) {
+  if (scanTableCache[crc]) return scanTableCache[crc];
+  var total = parseInt(knownCRCLength[crc], 10);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  var table = document.createElement("table");
+  var header = document.createElement("tr");
+  var th = document.createElement("th");
+  th.colSpan = 10;
+  th.textContent = (knownCRCFilename[crc] || (crc + ".txt")) + " (" + crc + ")";
+  header.appendChild(th);
+  table.appendChild(header);
+
+  var cells = new Array(total);
+  var row = document.createElement("tr");
+  for (var i = 0; i < total; i++) {
+    if (i > 0 && i % 10 === 0) {
+      table.appendChild(row);
+      row = document.createElement("tr");
+    }
+    var td = document.createElement("td");
+    td.style.backgroundColor = "red";
+    td.textContent = i;
+    row.appendChild(td);
+    cells[i] = td;
+  }
+  table.appendChild(row);
+
+  var scanView = document.getElementById("scanview");
+  if (scanView) scanView.appendChild(table);
+  scanTableCache[crc] = { table: table, cells: cells, lastHighlight: -1 };
+  return scanTableCache[crc];
+}
+
+function updateCrcCell(crc, idx, isCurrent) {
+  var cache = scanTableCache[crc] || ensureCrcTable(crc);
+  if (!cache) return;
+  var cell = cache.cells[idx];
+  if (!cell) return;
+  cell.style.backgroundColor = "lime";
+  if (cache.lastHighlight >= 0 && cache.cells[cache.lastHighlight]) {
+    cache.cells[cache.lastHighlight].style.fontWeight = "normal";
+  }
+  if (isCurrent) {
+    cell.style.fontWeight = "bold";
+    cache.lastHighlight = idx;
+  }
+}
+
 function downloadContentByCrc(szCrc) {
   var filename = "file.txt";
   if( knownCRCFilename[ szCrc ] )
@@ -247,65 +357,24 @@ function downloadContentByCrc(szCrc) {
  */
 function processScanData()
 {
-  var keys = Object.keys( dScans );
-  var resultContainer = document.getElementById('qr-reader-results');
   processSingleScan(szCachedLastScan);
-  keys = keys.sort();
-  var szResultOut = "<table class=\"resultsTable\">";
-  for(var i = 0; i < keys.length; ++i )
-  {
-    szResultOut += "<tr><td><div class=\"tdScanPreview\">" + keys[i].replaceAll("\n", "<br/>") + "</div></td>";
-    szResultOut += "<td><button onClick=\"makePopupOfString( getScanContentsByKeyId(" + i + ").replaceAll('\\n','<br/>') );\">View</button></td></tr>";
-
-    //Sample string:
-    //"Q:3:10:15748754::Four score seven years ago"
-    //processSingleScan( keys[i] );
+  if (szCachedLastScan) {
+    addScanResultRow(szCachedLastScan);
   }
-  szResultOut += "</table>";
-  resultContainer.innerHTML = szResultOut;
-  //Create the table of CRCs
-  var knownCRCKeys = Object.keys( knownCRCScans );
-  var tableOut = "";
-  for(var i = 0; i < knownCRCKeys.length; ++i )
-  {
-    tableOut += "<table><tr><th colspan=10>" + knownCRCFilename[ knownCRCKeys[i] ] + "(" + knownCRCKeys[i] + ")</th></tr>";
-    for(var j = 0; j < knownCRCLength[ knownCRCKeys[i] ]; ++j )
-    {
-      if( knownCRCScans[ knownCRCKeys[i] ][ j ] != null )
-      {
-        if( knownCRCKeys[i] == szCachedLastScanCRC && j == iCachedLastScanID )
-        {
-
-          tableOut += "<td bgcolor=lime><b>" + j + "</b></td>";
-        }
-        else
-        {
-          tableOut += "<td bgcolor=lime>" + j + "</td>";
-        }
-      }
-      else
-      {
-        tableOut += "<td bgcolor=red>" + j + "</td>";
-      }
-      if( j % 10 == 9 )
-      {
-        tableOut += "</tr><tr>";
-      }
-    }
-
-    tableOut += "</tr></table>";
+  if (szCachedLastScanCRC !== "") {
+    updateDecodeHint(szCachedLastScanCRC);
+    updateCrcCell(szCachedLastScanCRC, iCachedLastScanID, true);
   }
-  document.getElementById("scanview").innerHTML = tableOut;
   //check if any Crcs are fully ready.
   knownCRCLengthKeys = Object.keys(knownCRCLength);
   for(var i = 0; i < knownCRCLengthKeys.length; ++i )
   {
     var currentCrc = knownCRCLengthKeys[i];
-    if( knownCRCScans[ currentCrc ] == null || finishedFiles[ currentCrc ] != null )
+    if( knownCRCScans[ currentCrc ] == null || finishedFiles[ currentCrc ] != null || pendingDecode[ currentCrc ] )
     {
       continue;
     }
-    var currentCrcScanKeys = Object.keys(knownCRCScans[currentCrc])
+    var currentCrcScanKeys = Object.keys(knownCRCScans[currentCrc]);
     if( currentCrcScanKeys.length >= knownCRCLength[ currentCrc ] )
     {
       var outString = "";
@@ -327,38 +396,44 @@ function processScanData()
       finishedFiles[ currentCrc ] = outString;
       //parse the file.
       //new TextDecoder("Latin1").decode( new Uint8Array( finishedFilesArrayBuffer[1021043213] ) );
-      if( encoding == 'LB1' )
+      if( encoding == 'LB1' || encoding == 'LB1C' || encoding == 'LB6' )
       {
-        cachedOutString = outString;
-        cachedB10Decode = b10decode( outString );
-        cachedLZMAOut = LZMA.decompress( cachedB10Decode );
-        //cachedDecode = new TextDecoder("Latin1").decode( new Uint8Array( cachedLZMAOut ) );
-        //cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
-      }
-      else if( encoding == 'LB1C' )
-      {
-        cachedLZMAOut = LZMA.decompress( b10decodeChunks(chunkStrings) );
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+        pendingDecode[ currentCrc ] = true;
+        var decodeInput;
+        if (encoding == 'LB1') {
+          cachedOutString = outString;
+          decodeInput = b10decode(outString);
+        } else if (encoding == 'LB1C') {
+          decodeInput = b10decodeChunks(chunkStrings);
+        } else {
+          const binaryString = atob(outString);
+          var bytes = new Uint8Array( binaryString.length );
+          for( let i = 0; i < binaryString.length; ++i )
+          {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          decodeInput = bytes;
+        }
+        LZMA.decompress(decodeInput, function(result, error) {
+          pendingDecode[ currentCrc ] = false;
+          if (error) {
+            console.error(error);
+            return;
+          }
+          cachedLZMAOut = normalizeDecodedResult(result);
+          finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+          update_file_download_links();
+        });
       }
       else if( encoding == 'B10' )
       {
         finishedFilesArrayBuffer[ currentCrc ] = b10decode( outString );
+        update_file_download_links();
       }
       else if( encoding == 'B10C' )
       {
         finishedFilesArrayBuffer[ currentCrc ] = b10decodeChunks(chunkStrings).buffer;
-      }
-      else if( encoding == 'LB6' )
-      {
-        const binaryString = atob(outString);
-        var bytes = new Uint8Array( binaryString.length );
-        for( let i = 0; i < binaryString.length; ++i )
-        {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        cachedLZMAOut = LZMA.decompress( bytes );
-        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+        update_file_download_links();
       }
       else if( encoding == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
       {
@@ -370,12 +445,13 @@ function processScanData()
         }
         
         finishedFilesArrayBuffer[ currentCrc ] = bytes.buffer;
+        update_file_download_links();
       }
       else
       {
         finishedFilesArrayBuffer[ currentCrc ] = outString;
+        update_file_download_links();
       } //if filetype
-      update_file_download_links();
     }
   }
 }//process can data

@@ -77,12 +77,33 @@ html, body{ margin:0;padding:0}
           </select>
         </td>
         <td>
+          Scan FPS:<br/>
+          <input id="scanFps" type="number" min="1" max="120" value="30" />
+        </td>
+        <td>
+          Capture FPS:<br/>
+          <input id="captureFps" type="number" min="1" max="120" value="30" />
+        </td>
+        <td>
+          Resolution:<br/>
+          <select id="resolutionSelector">
+            <option value="640x480">640x480</option>
+            <option value="1280x720" selected>1280x720</option>
+            <option value="1920x1080">1920x1080</option>
+            <option value="2560x1440">2560x1440</option>
+          </select>
+        </td>
+        <td>
           Focus:<br />
           <input id="focusControl" type="range" min="0" max="100" value="50" />
         </td>
         <td>
+          <label><input id="focusLock" type="checkbox" />Lock Focus</label>
+        </td>
+        <td>
           Info:<br/>
           <input id="inputTextOut" />
+          <div id="decodeModeOut" style="font-size: 12px;"></div>
         </td>
       </tr>
     </table>
@@ -118,7 +139,11 @@ html, body{ margin:0;padding:0}
       });
       
       const cameraSelector = document.getElementById("cameraSelector");
-      const focusControl = document.getElementById("focusControl");      
+      const focusControl = document.getElementById("focusControl");
+      const focusLock = document.getElementById("focusLock");
+      const scanFpsInput = document.getElementById("scanFps");
+      const captureFpsInput = document.getElementById("captureFps");
+      const resolutionSelector = document.getElementById("resolutionSelector");
       const format = document.getElementById("format");
       const mode = document.getElementById("mode");
       const canvas = document.getElementById("canvas");
@@ -134,6 +159,10 @@ html, body{ margin:0;padding:0}
       video.setAttribute("autoplay", "");
 
       let stream;
+      let processing = false;
+      let lastScanTime = 0;
+      let scanIntervalMs = 1000 / 30;
+      let focusCaps = null;
 
       function readBarcodeFromCanvas(canvas, format, mode) {
         var imgWidth = canvas.width;
@@ -230,34 +259,98 @@ html, body{ margin:0;padding:0}
       const processFrame = function () {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const code = readBarcodeFromCanvas(canvas, format.value, mode.value === 'true');
-        if (code.format) {
-          //resultElement.innerText = code.format + ": " + escapeTags(code.text);
-          resultElement.innerText = code.text;
+        const now = performance.now();
+        if (now - lastScanTime >= scanIntervalMs) {
+          lastScanTime = now;
+          const code = readBarcodeFromCanvas(canvas, format.value, mode.value === 'true');
+          if (code.format) {
+            //resultElement.innerText = code.format + ": " + escapeTags(code.text);
+            resultElement.innerText = code.text;
 
-          //HotQr    
-          //add the scan.
-          dScans[ code.text ] = '1';
-          szCachedLastScan = code.text;
-          processScanData();
-          //End HotQR.
-          drawResult(code)
-        } else {
-          resultElement.innerText = "No barcode found";
+            //HotQr
+            //add the scan.
+            dScans[ code.text ] = '1';
+            szCachedLastScan = code.text;
+            processScanData();
+            //End HotQR.
+            drawResult(code)
+          } else {
+            resultElement.innerText = "No barcode found";
+          }
         }
         requestAnimationFrame(processFrame);
       };
+
+      function parseResolution(value) {
+        const parts = value.split('x');
+        const width = parseInt(parts[0], 10);
+        const height = parseInt(parts[1], 10);
+        return { width, height };
+      }
+
+      function applyCanvasSize(width, height) {
+        canvas.width = width;
+        canvas.height = height;
+        video.setAttribute("width", width);
+        video.setAttribute("height", height);
+      }
+
+      function getSelectedCaptureFps() {
+        const fps = parseInt(captureFpsInput.value, 10);
+        return Number.isFinite(fps) ? Math.max(1, Math.min(120, fps)) : 30;
+      }
+
+      function getSelectedScanFps() {
+        const fps = parseInt(scanFpsInput.value, 10);
+        return Number.isFinite(fps) ? Math.max(1, Math.min(120, fps)) : 30;
+      }
+
+      function applyFocusConstraints() {
+        if (!stream) return;
+        const track = stream.getVideoTracks()[0];
+        if (!track) return;
+        const caps = focusCaps || track.getCapabilities?.();
+        if (!caps) return;
+
+        const advanced = [];
+        if (caps.focusMode && focusLock) {
+          const lockOn = focusLock.checked;
+          const mode = lockOn ? "manual" : "continuous";
+          if (caps.focusMode.includes(mode)) {
+            advanced.push({ focusMode: mode });
+          }
+        }
+        if (caps.focusDistance && focusControl && !focusControl.disabled) {
+          if (!caps.focusMode || (focusLock && focusLock.checked)) {
+            advanced.push({ focusDistance: parseFloat(focusControl.value) });
+          }
+        }
+        if (advanced.length > 0) {
+          track.applyConstraints({ advanced }).catch(console.warn);
+        }
+      }
 
 
       const updateVideoStream = async function (deviceId) {
         // To ensure the camera switch, it is advisable to free up the media resources
         if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
 
+        const resolution = parseResolution(resolutionSelector.value);
+        const fps = getSelectedCaptureFps();
+        const selectedCamera = cameraSelector.value;
+        const videoConstraints = {
+          width: { ideal: resolution.width },
+          height: { ideal: resolution.height },
+          frameRate: { ideal: fps, max: fps }
+        };
+        if (selectedCamera === "user" || selectedCamera === "environment") {
+          videoConstraints.facingMode = selectedCamera;
+        } else if (selectedCamera) {
+          videoConstraints.deviceId = { exact: selectedCamera };
+        }
+
         const constraints = {
-          video: {
-            facingMode: cameraSelector.value,
-            focusMode: "manual"
-          },
+          video: videoConstraints,
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -266,6 +359,7 @@ html, body{ margin:0;padding:0}
         //check if focus control is supported
         const track = stream.getVideoTracks()[0];
         const capabilities = track.getCapabilities();
+        focusCaps = capabilities;
         if (capabilities.focusDistance) {
           focusControl.disabled = false;
           focusControl.min = capabilities.focusDistance.min;
@@ -273,15 +367,25 @@ html, body{ margin:0;padding:0}
           focusControl.step = capabilities.focusDistance.step || 1;
 
           // Set initial focus
-          updateFocus(focusControl.value);
+          applyFocusConstraints();
         } else {
           focusControl.disabled = true;
           console.warn("Focus control is not supported on this device.");
         }
+        if (!capabilities || !capabilities.focusMode) {
+          focusLock.disabled = true;
+        } else {
+          focusLock.disabled = false;
+        }
         //end focus
         video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
         video.play();
-        processFrame();
+        applyCanvasSize(video.videoWidth || resolution.width, video.videoHeight || resolution.height);
+        if (!processing) {
+          processing = true;
+          processFrame();
+        }
+        populateCameraSelector();
 
       };
 
@@ -289,27 +393,46 @@ html, body{ margin:0;padding:0}
         updateVideoStream(this.value);
       });
 
-      updateVideoStream();
+      scanFpsInput.addEventListener("change", function () {
+        scanIntervalMs = 1000 / getSelectedScanFps();
+      });
 
-      /*
-        Update foucs, called when the focus slider moves.
-      */
-      function updateFocus(value) {
-        const track = stream.getVideoTracks()[0];
-        //console.log(track);
-        track.applyConstraints({
-          advanced: [{ focusDistance: value }],
-        });
-      }
+      captureFpsInput.addEventListener("change", function () {
+        updateVideoStream();
+      });
+
+      resolutionSelector.addEventListener("change", function () {
+        updateVideoStream();
+      });
+
+      focusControl.addEventListener("input", function () {
+        applyFocusConstraints();
+      });
+
+      focusLock.addEventListener("change", function () {
+        applyFocusConstraints();
+      });
+
+      scanIntervalMs = 1000 / getSelectedScanFps();
+      updateVideoStream();
 
       // Function to populate cameraSelector with available video devices
       async function populateCameraSelector() {
         const cameraSelector = document.getElementById("cameraSelector");
-        
+        const currentValue = cameraSelector.value;
         // Clear any existing options
         cameraSelector.innerHTML = "";
 
         try {
+          const optFront = document.createElement("option");
+          optFront.value = "user";
+          optFront.text = "Front Camera";
+          cameraSelector.appendChild(optFront);
+          const optBack = document.createElement("option");
+          optBack.value = "environment";
+          optBack.text = "Back Camera";
+          cameraSelector.appendChild(optBack);
+
           // Get the list of media devices
           const devices = await navigator.mediaDevices.enumerateDevices();
 
@@ -337,6 +460,9 @@ html, body{ margin:0;padding:0}
           errorOption.value = "";
           errorOption.text = "Error accessing cameras";
           cameraSelector.appendChild(errorOption);
+        }
+        if (currentValue) {
+          cameraSelector.value = currentValue;
         }
       }
        
