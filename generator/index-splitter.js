@@ -36,6 +36,7 @@ var bLzma = 0;
 var cachedLastQr = null;
 var cachedFileContents = null;
 var cachedFileContentsRaw = null;
+var bUseChunkedBase10 = false;
 
 /*
  * Scale the output canvas if the fit box is checked.
@@ -381,12 +382,41 @@ function b_crc32 (str) {
  */
 const B10CONV_DIGITS_PER_BYTE = Math.log10(Math.pow(2, 8));
 
+const HEX_TABLE = (function () {
+  var table = new Array(256);
+  for (var i = 0; i < 256; i++) {
+    table[i] = i.toString(16).padStart(2, '0');
+  }
+  return table;
+})();
+
+function bytesToHex(byteArray) {
+  var out = new Array(byteArray.length);
+  for (var i = 0; i < byteArray.length; i++) {
+    out[i] = HEX_TABLE[byteArray[i]];
+  }
+  return out.join('');
+}
+
 function b10encode( arrayBuffer ) {
   let byteArray = new Uint8Array(arrayBuffer);
-  let raw = BigInt('0x' + Array.from(byteArray).map(byte => byte.toString(16).padStart(2, '0')).join('')).toString();
+  let raw = BigInt('0x' + bytesToHex(byteArray)).toString();
   let encodedLength = Math.ceil(byteArray.length * B10CONV_DIGITS_PER_BYTE);
   let prefix = '0'.repeat(encodedLength - raw.length);
   return prefix + raw;
+}
+
+function b10encodeToChunks(byteArray, maxDigitsPerChunk) {
+  var bytesPerChunk = Math.max(1, Math.floor(maxDigitsPerChunk / B10CONV_DIGITS_PER_BYTE));
+  var out = [];
+  for (var offset = 0; offset < byteArray.length; offset += bytesPerChunk) {
+    var slice = byteArray.subarray(offset, offset + bytesPerChunk);
+    var raw = BigInt('0x' + bytesToHex(slice)).toString();
+    var encodedLength = Math.ceil(slice.length * B10CONV_DIGITS_PER_BYTE);
+    var prefix = '0'.repeat(encodedLength - raw.length);
+    out.push(prefix + raw);
+  }
+  return out;
 }
 
 function b10decode(s)
@@ -463,7 +493,11 @@ function buildQStrForPage(pageIndex) {
   if (encodingType === 'base64') {
     fileData = (bLzma) ? "LB6" : "B64";
   } else if (encodingType === 'base10') {
-    fileData = (bLzma) ? "LB1" : "B10";
+    if (bUseChunkedBase10) {
+      fileData = (bLzma) ? "LB1C" : "B10C";
+    } else {
+      fileData = (bLzma) ? "LB1" : "B10";
+    }
   }
 
   // same header you already use in makeCodeByChunkId()
@@ -491,7 +525,11 @@ function makeCodeByChunkId( pageid )
   }
   else if( encodingType === 'base10' )
   {
-    fileData = (bLzma)?"LB1":"B10";
+    if (bUseChunkedBase10) {
+      fileData = (bLzma) ? "LB1C" : "B10C";
+    } else {
+      fileData = (bLzma) ? "LB1" : "B10";
+    }
   }
 
   qStr = qStrPrefix + szHeaderSeparator + pageid + szHeaderSeparator + chunks.length + szHeaderSeparator + icrc32 + szHeaderSeparator + szFilename + szHeaderSeparator + fileData + szHeaderTerminator + chunks[pageid];
@@ -1039,7 +1077,20 @@ function makeCodeInt (qStr, codeMode = null)
 //Calls makecode in response to a UI change.
 function ui_makeCode()
 {
-  chunks = [];
+  var encodingType = document.querySelector('input[name="encodeAs"]:checked')?.value;
+  var splitSize = parseInt(document.getElementById('split_size').value);
+  var fileInput = document.getElementById('fileInput');
+  var hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+  if (encodingType === 'base10' && cachedFileContents && hasFile && splitSize === 0) {
+    bUseChunkedBase10 = false;
+    document.getElementById('text').value = b10encode(cachedFileContents);
+  }
+  if (bUseChunkedBase10 && encodingType === 'base10' && cachedFileContents && splitSize > 0 && hasFile) {
+    chunks = b10encodeToChunks(cachedFileContents, splitSize);
+    document.getElementById('text').value = "";
+  } else {
+    chunks = [];
+  }
   makeCode();
 }
 
@@ -1076,6 +1127,7 @@ function ui_loadFileToInput()
 
       cachedFileContents = fileContents;
 
+      bUseChunkedBase10 = false;
       if (encodingType === 'base64')
       {
         //if the split_size is a default, change ui settings for splitter
@@ -1119,7 +1171,16 @@ function ui_loadFileToInput()
             document.getElementById("iMinVersion").value = 17;            
           }
         }
-        encoded = b10encode( fileContents );
+        var splitSize = parseInt(document.getElementById("split_size").value);
+        if (splitSize > 0)
+        {
+          bUseChunkedBase10 = true;
+          encoded = "";
+        }
+        else
+        {
+          encoded = b10encode( fileContents );
+        }
       }
       else
       {
@@ -1165,6 +1226,7 @@ async function processClipboardImageBlob(blob, suggestedName = 'pasted.png') {
 
     // Encode using the same branches as the file picker
     let encoded;
+    bUseChunkedBase10 = false;
     if (encodingType === 'base64') {
       // apply the same UI defaults you use in the file path, if desired
       if ([0,410,1400,1100].includes(+document.getElementById("split_size").value)) {
@@ -1189,7 +1251,13 @@ async function processClipboardImageBlob(blob, suggestedName = 'pasted.png') {
           document.getElementById("iMinVersion").value = 17;
         }
       }
-      encoded = b10encode(fileContents);
+      var splitSize = parseInt(document.getElementById("split_size").value);
+      if (splitSize > 0) {
+        bUseChunkedBase10 = true;
+        encoded = "";
+      } else {
+        encoded = b10encode(fileContents);
+      }
     } else {
       // Raw text (for non-binary content)
       encoded = new TextDecoder("utf-8").decode(fileContents);
@@ -1440,4 +1508,3 @@ document.addEventListener('paste', async (e) => {
 
 //atob( document.getElementById("text").value );
 // b10decode( document.getElementById("text").value );
-

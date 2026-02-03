@@ -83,6 +83,23 @@ function b10decode(s)
   return byteArray;
 }
 
+function b10decodeChunks(chunkStrings)
+{
+  var arrays = new Array(chunkStrings.length);
+  var totalLength = 0;
+  for (var i = 0; i < chunkStrings.length; i++) {
+    arrays[i] = b10decode(chunkStrings[i]);
+    totalLength += arrays[i].length;
+  }
+  var out = new Uint8Array(totalLength);
+  var offset = 0;
+  for (var j = 0; j < arrays.length; j++) {
+    out.set(arrays[j], offset);
+    offset += arrays[j].length;
+  }
+  return out;
+}
+
 function b10decode_totext(s)
 {
   var decoder = new TextDecoder();  
@@ -292,10 +309,15 @@ function processScanData()
     if( currentCrcScanKeys.length >= knownCRCLength[ currentCrc ] )
     {
       var outString = "";
+      var chunkStrings = new Array(knownCRCLength[currentCrc]);
       document.getElementById("inputTextOut").value = currentCrc + " is done";
-      for(var j = 0; j < currentCrcScanKeys.length; ++j )
+      for (var j = 0; j < knownCRCLength[currentCrc]; ++j)
       {
-        outString += knownCRCScans[currentCrc][ currentCrcScanKeys[j] ];
+        chunkStrings[j] = knownCRCScans[currentCrc][j];
+      }
+      var encoding = knownCRCEncoding[ currentCrc ];
+      if (encoding !== 'B10C' && encoding !== 'LB1C') {
+        outString = chunkStrings.join("");
       }
       if( bDebug )
       {
@@ -305,7 +327,7 @@ function processScanData()
       finishedFiles[ currentCrc ] = outString;
       //parse the file.
       //new TextDecoder("Latin1").decode( new Uint8Array( finishedFilesArrayBuffer[1021043213] ) );
-      if( knownCRCEncoding[ currentCrc ] == 'LB1' )
+      if( encoding == 'LB1' )
       {
         cachedOutString = outString;
         cachedB10Decode = b10decode( outString );
@@ -314,11 +336,20 @@ function processScanData()
         //cachedArrayBuffer = new TextEncoder("Latin1").encode( cachedDecode ).buffer;
         finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
       }
-      else if( knownCRCEncoding[ currentCrc ] == 'B10' )
+      else if( encoding == 'LB1C' )
+      {
+        cachedLZMAOut = LZMA.decompress( b10decodeChunks(chunkStrings) );
+        finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
+      }
+      else if( encoding == 'B10' )
       {
         finishedFilesArrayBuffer[ currentCrc ] = b10decode( outString );
       }
-      else if( knownCRCEncoding[ currentCrc ] == 'LB6' )
+      else if( encoding == 'B10C' )
+      {
+        finishedFilesArrayBuffer[ currentCrc ] = b10decodeChunks(chunkStrings).buffer;
+      }
+      else if( encoding == 'LB6' )
       {
         const binaryString = atob(outString);
         var bytes = new Uint8Array( binaryString.length );
@@ -329,7 +360,7 @@ function processScanData()
         cachedLZMAOut = LZMA.decompress( bytes );
         finishedFilesArrayBuffer[ currentCrc ] = cachedLZMAOut;
       }
-      else if( knownCRCEncoding[ currentCrc ] == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
+      else if( encoding == 'B64' || base64regex.test( outString ) ) //base64, but not labeled as base64
       {
         const binaryString = atob(outString);
         var bytes = new Uint8Array( binaryString.length );
@@ -549,5 +580,3 @@ function testShortScan()
   dScans[ s1 ] = 1;
   dScans[ s2 ] = 1;
 }
-
-
