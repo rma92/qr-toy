@@ -103,6 +103,25 @@ main {
   background: #ffffff;
 }
 
+.settings-box {
+  max-width: 42rem;
+  padding: 0.75rem;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-box h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.settings-status {
+  min-height: 1.5rem;
+  margin: 0.6rem 0 0;
+  color: #56645d;
+}
+
 label,
 fieldset {
   display: grid;
@@ -262,7 +281,7 @@ textarea {
 
   .tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .reader-controls,

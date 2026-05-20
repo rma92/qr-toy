@@ -3,8 +3,10 @@
 
   const generatePanel = document.getElementById("generatePanel");
   const readPanel = document.getElementById("readPanel");
+  const settingsPanel = document.getElementById("settingsPanel");
   const tabGenerate = document.getElementById("tabGenerate");
   const tabRead = document.getElementById("tabRead");
+  const tabSettings = document.getElementById("tabSettings");
 
   const cameraSelector = document.getElementById("cameraSelector");
   const focusControl = document.getElementById("focusControl");
@@ -17,6 +19,8 @@
   const startButton = document.getElementById("buttonStartCamera");
   const stopButton = document.getElementById("buttonStopCamera");
   const clearReaderButton = document.getElementById("buttonClearReader");
+  const invalidateCacheButton = document.getElementById("buttonInvalidateCache");
+  const cacheStatus = document.getElementById("cacheStatus");
   const colorSweep = document.getElementById("colorSweep");
   const invertSweep = document.getElementById("invertSweep");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -95,12 +99,17 @@
   function setActiveTab(next) {
     activeTab = next;
     const reading = next === "read";
-    generatePanel.classList.toggle("active", !reading);
+    const generating = next === "generate";
+    const settings = next === "settings";
+    generatePanel.classList.toggle("active", generating);
     readPanel.classList.toggle("active", reading);
-    tabGenerate.classList.toggle("active", !reading);
+    settingsPanel.classList.toggle("active", settings);
+    tabGenerate.classList.toggle("active", generating);
     tabRead.classList.toggle("active", reading);
-    tabGenerate.setAttribute("aria-selected", String(!reading));
+    tabSettings.classList.toggle("active", settings);
+    tabGenerate.setAttribute("aria-selected", String(generating));
     tabRead.setAttribute("aria-selected", String(reading));
+    tabSettings.setAttribute("aria-selected", String(settings));
 
     if (reading) {
       startScanner();
@@ -338,8 +347,29 @@
     if (message) resultElement.textContent = message;
   }
 
+  async function invalidateCacheAndReload() {
+    if (cacheStatus) cacheStatus.textContent = "Clearing offline cache...";
+    try {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("reload", Date.now().toString());
+      if (cacheStatus) cacheStatus.textContent = "Reloading from network...";
+      window.location.replace(url.toString());
+    } catch (err) {
+      if (cacheStatus) cacheStatus.textContent = err && err.message ? err.message : String(err);
+    }
+  }
+
   tabGenerate.addEventListener("click", () => setActiveTab("generate"));
   tabRead.addEventListener("click", () => setActiveTab("read"));
+  tabSettings.addEventListener("click", () => setActiveTab("settings"));
   startButton.addEventListener("click", () => {
     if (activeTab !== "read") setActiveTab("read");
     else startScanner();
@@ -348,6 +378,7 @@
   clearReaderButton.addEventListener("click", () => {
     if (typeof clearReaderData === "function") clearReaderData();
   });
+  invalidateCacheButton.addEventListener("click", invalidateCacheAndReload);
   cameraSelector.addEventListener("change", () => {
     if (scannerRunning) {
       stopScanner("Switching camera");

@@ -1,4 +1,4 @@
-const CACHE_NAME = "hotqr-combined-20260519-6";
+const CACHE_NAME = "hotqr-combined-20260519-7";
 
 const APP_SHELL = [
   "./",

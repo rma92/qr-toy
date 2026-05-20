@@ -24,6 +24,7 @@
       <nav class="tabs" aria-label="HotQR modes">
         <button id="tabGenerate" class="tab-button active" type="button" aria-controls="generatePanel">Generate</button>
         <button id="tabRead" class="tab-button" type="button" aria-controls="readPanel">Read</button>
+        <button id="tabSettings" class="tab-button" type="button" aria-controls="settingsPanel">Settings</button>
       </nav>
     </header>
 
@@ -232,6 +233,14 @@
         <div id="scanview" class="scanview"></div>
         <div id="file-links" class="file-links"></div>
         <div id="qr-reader-results" class="reader-results"></div>
+      </section>
+
+      <section id="settingsPanel" class="tab-panel" aria-labelledby="tabSettings">
+        <div class="settings-box">
+          <h2>Settings</h2>
+          <button id="buttonInvalidateCache" type="button">Invalidate Cache and Reload</button>
+          <p id="cacheStatus" class="settings-status"></p>
+        </div>
       </section>
     </main>
 
