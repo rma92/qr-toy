@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="HotQR">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1f6f5b">
+    <title>HotQR</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" sizes="144x144" href="htqr_gen.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="qrcodegen-v1.8.0-es6.min.js"></script>
+    <script src="lzma_worker-min.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>HotQR</h1>
+        <p>Generate and read HotQR chunks offline.</p>
+      </div>
+      <nav class="tabs" aria-label="HotQR modes">
+        <button id="tabGenerate" class="tab-button active" type="button" aria-controls="generatePanel">Generate</button>
+        <button id="tabRead" class="tab-button" type="button" aria-controls="readPanel">Read</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="generatePanel" class="tab-panel active" aria-labelledby="tabGenerate">
+        <div id="toolbar" class="toolbar">
+          <button id="buttomImageMode" type="button">Image</button>
+          <button id="buttonTextMode" type="button">Text</button>
+          <button id="buttonToggleDebug" type="button">Debug</button>
+          <button id="buttonToggleControls" type="button">Toolbar</button>
+          <button id="buttonClear" type="button">Clear</button>
+          <button id="buttonWifi" type="button">Wifi</button>
+          <button id="buttonPaste" type="button">Paste</button>
+        </div>
+
+        <div id="controlBox" class="control-box">
+          <label class="wide-field">
+            Text
+            <textarea id="text">HTTP://RM.VG/</textarea>
+          </label>
+
+          <div class="control-grid">
+            <label>Code mode
+              <select id="codeMode">
+                <option value="qr" selected>qr</option>
+                <option value="microqr">microqr</option>
+                <option value="aztec">aztec</option>
+                <option value="pdf417">pdf417</option>
+                <option value="datamatrix">datamatrix</option>
+                <option value="qr2">qr (barcode.js)</option>
+              </select>
+            </label>
+            <label class="file-field">File
+              <input type="file" id="fileInput" accept="*/*">
+            </label>
+            <fieldset>
+              <legend>Encode</legend>
+              <label><input type="radio" name="encodeAs" id="encodeAsBase64" value="base64"> Base64</label>
+              <label><input type="radio" name="encodeAs" id="encodeAsBase10" value="base10" checked> Base10</label>
+              <label><input type="radio" name="encodeAs" id="encodeAsRaw" value="raw"> Raw</label>
+            </fieldset>
+            <label class="check"><input type="checkbox" name="lzmaEnable" id="lzmaEnable" checked> LZMA file</label>
+            <label class="check"><input type="checkbox" id="bChunkLocalEncoding" checked> Large-file chunks</label>
+            <output id="fileSizeOut">(filesize)</output>
+            <label>Filename
+              <input id="szFilename" value="out.txt">
+            </label>
+            <label>Split size
+              <input id="split_size" type="number" value="0" min="0" max="8000">
+            </label>
+            <label>Time ms
+              <input id="split_time" type="number" value="130" min="1" max="10000">
+            </label>
+            <label class="check"><input type="checkbox" id="bRgbOverlay"> RGB overlay</label>
+            <label class="check"><input type="checkbox" id="bInvertRGB"> Invert RGB</label>
+          </div>
+
+          <div class="control-grid compact">
+            <label>ECC
+              <select id="eccLevel">
+                <option value="L">L (7%)</option>
+                <option value="M">M (15%)</option>
+                <option value="Q">Q (25%)</option>
+                <option value="H">H (30%)</option>
+              </select>
+            </label>
+            <label>Scale
+              <input type="number" id="scale" value="18" min="1" max="32">
+            </label>
+            <label class="check"><input type="checkbox" name="bFit" id="bFit" checked> Fit</label>
+            <label>CurLength
+              <input id="strlen" type="text" readonly value="-1" size="6">
+            </label>
+            <label>Mask
+              <select id="iMask" name="iMask">
+                <option value="-1">Auto</option>
+                <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option>
+              </select>
+            </label>
+            <label>MinVer
+              <input type="number" id="iMinVersion" value="1" min="1" max="40">
+            </label>
+            <label>MaxVer
+              <input type="number" id="iMaxVersion" value="40" min="1" max="40">
+            </label>
+          </div>
+
+          <div class="control-grid compact">
+            <label>Renderer
+              <select id="szRenderer" name="szRenderer">
+                <option value="general">general</option>
+                <option value="circle">circle</option>
+                <option value="circle2">circleAll</option>
+              </select>
+            </label>
+            <label>White
+              <input id="szWhiteColor" value="#ffffff">
+            </label>
+            <label>Black
+              <input id="szBlackColor" value="#000000">
+            </label>
+            <div id="domExpandedRenderOptions" class="expanded-options"></div>
+          </div>
+
+          <div class="control-grid compact">
+            <button id="buttonToStaticPage" type="button">Make Static Page</button>
+            <button id="buttonStartTimer" type="button">Start Timer</button>
+            <button id="buttonStopTimer" type="button">Stop Timer</button>
+            <fieldset>
+              <legend>Static page</legend>
+              <label><input type="radio" name="staticPageAs" id="staticPageAsRaw" value="raw"> Raw</label>
+              <label><input type="radio" name="staticPageAs" id="staticPageAsLines" value="lines" checked> One Per Line</label>
+              <label><input type="radio" name="staticPageAs" id="staticPageAsTable" value="table"> Table</label>
+            </fieldset>
+            <label class="check"><input type="checkbox" name="staticPageLabel" id="staticPageLabel" checked> Label codes</label>
+            <label>Font size
+              <input type="number" id="staticPageFontSize" value="100" min="1" max="320">
+            </label>
+            <label>Columns
+              <input type="number" id="staticPageTableColumns" value="3" min="1" max="10000">
+            </label>
+          </div>
+        </div>
+
+        <div id="tabbox" class="output-box">
+          <input id="pageDataOut" size="30" aria-label="Page data">
+          <div id="tab1">
+            <canvas id="cOut" width="1200" height="1200"></canvas>
+          </div>
+          <div id="tab2">
+            <textarea id="textOut"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section id="readPanel" class="tab-panel" aria-labelledby="tabRead">
+        <div class="reader-controls">
+          <label>Camera
+            <select id="cameraSelector">
+              <option value="user">Front Camera</option>
+              <option value="environment">Back Camera</option>
+            </select>
+          </label>
+          <label>Format
+            <select id="format">
+              <option value="" selected>Any</option>
+              <option value="Aztec">Aztec</option>
+              <option value="CODE_39">Code39</option>
+              <option value="Code93">Code93</option>
+              <option value="Code128">Code128</option>
+              <option value="DataMatrix">DataMatrix</option>
+              <option value="EAN8">EAN-8</option>
+              <option value="EAN13">EAN-13</option>
+              <option value="PDF417">PDF417</option>
+              <option value="QRCode">QRCode</option>
+              <option value="MicroQRCode">Micro QRCode</option>
+              <option value="RMQRCode">rMQR Code</option>
+              <option value="LinearCodes">Linear Codes</option>
+              <option value="MatrixCodes">Matrix Codes</option>
+            </select>
+          </label>
+          <label>Mode
+            <select id="mode">
+              <option value="true" selected>Normal</option>
+              <option value="false">Fast</option>
+            </select>
+          </label>
+          <label>Focus
+            <input id="focusControl" type="range" min="0" max="100" value="50">
+          </label>
+          <label>Info
+            <input id="inputTextOut">
+          </label>
+          <label>Resolution
+            <select id="cameraResolution">
+              <option value="640x480">640x480</option>
+              <option value="1280x720" selected>1280x720</option>
+              <option value="1920x1080">1920x1080</option>
+              <option value="0x0">Default</option>
+            </select>
+          </label>
+          <label>Frame rate
+            <select id="cameraFrameRate">
+              <option value="0">Default</option>
+              <option value="15">15 fps</option>
+              <option value="30" selected>30 fps</option>
+              <option value="60">60 fps</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="colorSweep"> RGB sweep</label>
+          <label class="check"><input type="checkbox" id="invertSweep"> Inverted pass</label>
+          <label class="check"><input type="checkbox" id="debugStoreAllScans"> Add all scans to list (debug)</label>
+          <button id="buttonStartCamera" type="button">Start Camera</button>
+          <button id="buttonStopCamera" type="button">Stop Camera</button>
+          <button id="buttonClearReader" type="button">Clear</button>
+        </div>
+
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <div id="rgb-previews" class="rgb-previews">
+          <canvas id="prev-red" width="160" height="120"></canvas>
+          <canvas id="prev-green" width="160" height="120"></canvas>
+          <canvas id="prev-blue" width="160" height="120"></canvas>
+        </div>
+        <div id="result" class="scan-result">Camera stopped</div>
+        <div id="scanview" class="scanview"></div>
+        <div id="file-links" class="file-links"></div>
+        <div id="qr-reader-results" class="reader-results"></div>
+      </section>
+    </main>
+
+    <script src="barcode.min.js"></script>
+    <script src="index-splitter.js"></script>
+    <script src="extendedRenderer.js"></script>
+    <script src="hotqr_reader.js"></script>
+    <script src="reader-fixes.js"></script>
+    <script src="zxing_reader.js"></script>
+    <script src="app-scanner.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      }
+    </script>
+  </body>
+</html>

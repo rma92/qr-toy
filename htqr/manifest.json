@@ -1,0 +1,17 @@
+{
+  "name": "HotQR",
+  "short_name": "HotQR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f4",
+  "theme_color": "#1f6f5b",
+  "description": "Generate and read HotQR codes offline.",
+  "icons": [
+    {
+      "src": "htqr_gen.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}

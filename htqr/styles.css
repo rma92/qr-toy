@@ -1,0 +1,272 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #f6f7f4;
+  color: #17211d;
+  font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #9ca89f;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17211d;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+button:hover,
+.tab-button.active {
+  border-color: #1f6f5b;
+  background: #e9f2ee;
+}
+
+.app-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid #d8ddd7;
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.app-header p {
+  margin: 0.15rem 0 0;
+  color: #56645d;
+}
+
+.tabs,
+.toolbar,
+.reader-controls,
+.control-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.tab-button {
+  min-width: 6rem;
+}
+
+main {
+  padding: 1rem;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.control-box,
+.output-box,
+.reader-controls,
+.scanview,
+.file-links,
+.reader-results,
+.scan-result {
+  margin-top: 0.75rem;
+}
+
+.control-box,
+.reader-controls {
+  padding: 0.75rem;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+label,
+fieldset {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 6rem;
+  color: #34423b;
+}
+
+fieldset {
+  grid-auto-flow: column;
+  align-items: center;
+  border: 1px solid #d8ddd7;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+
+fieldset label,
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: auto;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #aeb8b1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17211d;
+  padding: 0.35rem 0.45rem;
+}
+
+textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.wide-field {
+  display: grid;
+  margin-bottom: 0.7rem;
+}
+
+#text {
+  width: min(100%, 62rem);
+}
+
+.compact {
+  margin-top: 0.55rem;
+}
+
+.expanded-options {
+  flex-basis: 100%;
+}
+
+#pageDataOut {
+  width: min(100%, 38rem);
+  margin-bottom: 0.5rem;
+}
+
+#cOut {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #b03939;
+  background: #ffffff;
+}
+
+#tab2 {
+  display: none;
+}
+
+#textOut {
+  width: min(100%, 48rem);
+  height: 28rem;
+}
+
+#canvas {
+  display: block;
+  width: min(98vw, 820px);
+  height: auto;
+  margin-top: 0.75rem;
+  border: 2px solid #b03939;
+  background: #111;
+}
+
+.rgb-previews {
+  display: none;
+  margin-top: 0.6rem;
+}
+
+.rgb-previews canvas {
+  width: 31%;
+  max-width: 160px;
+  height: auto;
+  border: 1px solid #aeb8b1;
+  background: #fff;
+}
+
+.resultsTable,
+.scanview table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 62rem;
+  background: #ffffff;
+}
+
+.resultsTable td,
+.scanview td,
+.scanview th {
+  border: 1px solid #d8ddd7;
+  padding: 0.35rem;
+  vertical-align: top;
+}
+
+.tdScanPreview {
+  max-width: 48rem;
+  max-height: 7rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chunk-present {
+  background: #9fed9f;
+}
+
+.chunk-missing {
+  background: #ff9b9b;
+}
+
+.file-links img {
+  max-width: min(100%, 36rem);
+  height: auto;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.scan-result {
+  height: 7rem;
+  max-width: min(100%, 62rem);
+  overflow: auto;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  background: #ffffff;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 700px) {
+  .app-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .reader-controls,
+  .control-grid {
+    align-items: stretch;
+  }
+}
