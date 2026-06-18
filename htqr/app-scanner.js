@@ -43,6 +43,15 @@
   let decodeIntervalMs = 140;
   const wasmHeapCache = { ptr: 0, bytes: 0 };
   const filterCache = {};
+  const passStyles = {
+    original: { label: "Original", color: "#d62424" },
+    red: { label: "Red", color: "#d62424" },
+    green: { label: "Green", color: "#188a42" },
+    blue: { label: "Blue", color: "#2469d6" },
+    "red-invert": { label: "Red inverted", color: "#d62424" },
+    "green-invert": { label: "Green inverted", color: "#188a42" },
+    "blue-invert": { label: "Blue inverted", color: "#2469d6" }
+  };
 
   ZXing().then((instance) => {
     zxingInstance = instance;
@@ -132,12 +141,90 @@
     return wasmHeapCache.ptr;
   }
 
-  function readBarcodeFromBuffer(rgbaBuffer, imgWidth, imgHeight, formatName, tryHarder) {
-    if (!zxingReady || !zxingInstance.readBarcodeFromPixmap) return null;
+  function clonePoint(point) {
+    if (!point) return null;
+    return { x: Number(point.x) || 0, y: Number(point.y) || 0 };
+  }
+
+  function normalizeReadResult(result, pass) {
+    if (!result) return null;
+    const normalized = {
+      text: result.text || "",
+      format: result.format || "",
+      error: result.error || "",
+      pass
+    };
+    if (result.position) {
+      normalized.position = {
+        topLeft: clonePoint(result.position.topLeft),
+        topRight: clonePoint(result.position.topRight),
+        bottomRight: clonePoint(result.position.bottomRight),
+        bottomLeft: clonePoint(result.position.bottomLeft)
+      };
+    }
+    if (result.symbologyIdentifier) normalized.symbologyIdentifier = result.symbologyIdentifier;
+    return normalized;
+  }
+
+  function readBarcodesFromBuffer(rgbaBuffer, imgWidth, imgHeight, formatName, tryHarder, pass) {
+    if (!zxingReady || (!zxingInstance.readBarcodesFromPixmap && !zxingInstance.readBarcodeFromPixmap)) return [];
     const ptr = ensureHeap(rgbaBuffer.byteLength);
-    if (!ptr) return null;
+    if (!ptr) return [];
     zxingInstance.HEAPU8.set(rgbaBuffer, ptr);
-    return zxingInstance.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, tryHarder, formatName);
+
+    const readSingle = () => {
+      if (!zxingInstance.readBarcodeFromPixmap) return [];
+      const result = zxingInstance.readBarcodeFromPixmap(ptr, imgWidth, imgHeight, tryHarder, formatName);
+      try {
+        return result ? [normalizeReadResult(result, pass)] : [];
+      } finally {
+        if (result && typeof result.delete === "function") result.delete();
+      }
+    };
+
+    if (zxingInstance.readBarcodesFromPixmap) {
+      try {
+        let vector = null;
+        const results = [];
+        try {
+          vector = zxingInstance.readBarcodesFromPixmap(ptr, imgWidth, imgHeight, tryHarder, formatName);
+          const size = vector && typeof vector.size === "function" ? vector.size() : 0;
+          for (let i = 0; i < size; i += 1) {
+            let result = null;
+            try {
+              result = vector.get(i);
+              results.push(normalizeReadResult(result, pass));
+            } finally {
+              if (result && typeof result.delete === "function") result.delete();
+            }
+          }
+        } finally {
+          if (vector && typeof vector.delete === "function") vector.delete();
+        }
+        const normalized = results.filter(Boolean);
+        return normalized.length ? normalized : readSingle();
+      } catch (e) {
+        return readSingle();
+      }
+    }
+
+    return readSingle();
+  }
+
+  function percentileFromHistogram(histogram, total, percentile) {
+    const target = Math.max(0, Math.min(total - 1, Math.floor(total * percentile)));
+    let count = 0;
+    for (let i = 0; i < histogram.length; i += 1) {
+      count += histogram[i];
+      if (count > target) return i;
+    }
+    return histogram.length - 1;
+  }
+
+  function stretchSignalToLuma(signal, low, high) {
+    if (high <= low) return signal > low ? 0 : 255;
+    const stretched = Math.max(0, Math.min(255, ((signal - low) * 255) / (high - low)));
+    return 255 - (stretched | 0);
   }
 
   function filteredBuffer(src, pass) {
@@ -147,14 +234,39 @@
       filterCache[pass] = out;
     }
 
+    const invert = pass.endsWith("-invert");
+    const channel = channelFromPass(pass);
+
+    if (channel === "red" || channel === "green" || channel === "blue") {
+      const channelOffset = channel === "red" ? 0 : channel === "green" ? 1 : 2;
+      const histogram = new Uint32Array(256);
+      for (let i = 0; i < src.length; i += 4) {
+        const value = src[i + channelOffset];
+        const signal = invert ? value : 255 - value;
+        histogram[signal] += 1;
+      }
+
+      const total = src.length / 4;
+      const low = percentileFromHistogram(histogram, total, 0.01);
+      let high = percentileFromHistogram(histogram, total, 0.99);
+      if (high <= low) high = percentileFromHistogram(histogram, total, 0.999);
+
+      for (let i = 0; i < src.length; i += 4) {
+        const value = src[i + channelOffset];
+        const signal = invert ? value : 255 - value;
+        const y = stretchSignalToLuma(signal, low, high);
+        out[i] = y;
+        out[i + 1] = y;
+        out[i + 2] = y;
+        out[i + 3] = src[i + 3];
+      }
+      return out;
+    }
+
     for (let i = 0; i < src.length; i += 4) {
       const r = src[i], g = src[i + 1], b = src[i + 2], a = src[i + 3];
-      let y;
-      if (pass.startsWith("red")) y = r;
-      else if (pass.startsWith("green")) y = g;
-      else if (pass.startsWith("blue")) y = b;
-      else y = (0.2126 * r + 0.7152 * g + 0.0722 * b) | 0;
-      if (pass.endsWith("-invert")) y = 255 - y;
+      let y = (0.2126 * r + 0.7152 * g + 0.0722 * b) | 0;
+      if (invert) y = 255 - y;
       out[i] = y;
       out[i + 1] = y;
       out[i + 2] = y;
@@ -168,37 +280,65 @@
     const seen = new Set();
     const tryHarder = mode.value === "true";
     const formatName = format.value;
-    const push = (res, pass) => {
-      if (res && res.format && !res.error && res.text && !seen.has(res.text)) {
-        seen.add(res.text);
-        results.push({ code: res, pass });
+    const push = (codes, pass) => {
+      for (const code of codes) {
+        if (!code || !code.format || code.error || !code.text) continue;
+        const key = `${code.format}\n${code.text}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push({ code, pass });
+        }
       }
     };
 
+    push(readBarcodesFromBuffer(imageData.data, imageData.width, imageData.height, formatName, tryHarder, "original"), "original");
+
     if (colorSweep.checked) {
-      const passes = invertSweep.checked ? ["red-invert", "green-invert", "blue-invert"] : ["red", "green", "blue"];
+      const passes = ["red", "green", "blue"];
+      if (invertSweep.checked) passes.push("red-invert", "green-invert", "blue-invert");
       for (const pass of passes) {
-        push(readBarcodeFromBuffer(filteredBuffer(imageData.data, pass), imageData.width, imageData.height, formatName, tryHarder), pass);
+        push(readBarcodesFromBuffer(filteredBuffer(imageData.data, pass), imageData.width, imageData.height, formatName, tryHarder, pass), pass);
       }
-      return results;
     }
 
-    push(readBarcodeFromBuffer(imageData.data, imageData.width, imageData.height, formatName, tryHarder), "original");
     return results;
   }
 
-  function drawCodeOutline(targetCtx, code, scaleX, scaleY, color) {
+  function styleForPass(pass) {
+    return passStyles[pass] || passStyles[channelFromPass(pass)] || passStyles.original;
+  }
+
+  function drawCodeOutline(targetCtx, code, scaleX, scaleY, color, label) {
     if (!code.position) return;
+    const p = code.position;
+    if (!p.topLeft || !p.topRight || !p.bottomRight || !p.bottomLeft) return;
+    const points = [p.topLeft, p.topRight, p.bottomRight, p.bottomLeft].map((point) => ({
+      x: point.x * scaleX,
+      y: point.y * scaleY
+    }));
     targetCtx.beginPath();
     targetCtx.lineWidth = 3;
     targetCtx.strokeStyle = color;
-    const p = code.position;
-    targetCtx.moveTo(p.topLeft.x * scaleX, p.topLeft.y * scaleY);
-    targetCtx.lineTo(p.topRight.x * scaleX, p.topRight.y * scaleY);
-    targetCtx.lineTo(p.bottomRight.x * scaleX, p.bottomRight.y * scaleY);
-    targetCtx.lineTo(p.bottomLeft.x * scaleX, p.bottomLeft.y * scaleY);
+    targetCtx.moveTo(points[0].x, points[0].y);
+    targetCtx.lineTo(points[1].x, points[1].y);
+    targetCtx.lineTo(points[2].x, points[2].y);
+    targetCtx.lineTo(points[3].x, points[3].y);
     targetCtx.closePath();
     targetCtx.stroke();
+
+    if (label) {
+      const labelX = Math.max(0, Math.min(...points.map((point) => point.x)));
+      const labelY = Math.max(0, Math.min(...points.map((point) => point.y)) - 18);
+      targetCtx.save();
+      targetCtx.font = "13px sans-serif";
+      targetCtx.textBaseline = "top";
+      const width = Math.ceil(targetCtx.measureText(label).width) + 8;
+      targetCtx.fillStyle = color;
+      targetCtx.fillRect(labelX, labelY, width, 17);
+      targetCtx.fillStyle = "#fff";
+      targetCtx.fillText(label, labelX + 4, labelY + 2);
+      targetCtx.restore();
+    }
   }
 
   function channelFromPass(pass) {
@@ -223,18 +363,20 @@
       const tmp = document.createElement("canvas");
       tmp.width = imageData.width;
       tmp.height = imageData.height;
-      const filterPass = invertSweep.checked ? `${pass}-invert` : pass;
+      const filterPass = pass;
       tmp.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(filteredBuffer(imageData.data, filterPass)), imageData.width, imageData.height), 0, 0);
       pctx.clearRect(0, 0, preview.width, preview.height);
       pctx.drawImage(tmp, 0, 0, preview.width, preview.height);
-      (detections[channelFromPass(filterPass)] || []).forEach((code) => {
-        drawCodeOutline(pctx, code, preview.width / imageData.width, preview.height / imageData.height, "#d62424");
+      (detections[channelFromPass(filterPass)] || []).forEach((entry) => {
+        const style = styleForPass(entry.pass);
+        drawCodeOutline(pctx, entry.code, preview.width / imageData.width, preview.height / imageData.height, style.color, style.label);
       });
     });
   }
 
-  function drawResult(code) {
-    drawCodeOutline(ctx, code, 1, 1, "#d62424");
+  function drawResult(entry) {
+    const style = styleForPass(entry.pass);
+    drawCodeOutline(ctx, entry.code, 1, 1, style.color, style.label);
   }
 
   function groupDetections(codes) {
@@ -242,7 +384,7 @@
     codes.forEach((entry) => {
       const channel = channelFromPass(entry.pass);
       if (!grouped[channel]) grouped[channel] = [];
-      grouped[channel].push(entry.code);
+      grouped[channel].push(entry);
     });
     return grouped;
   }
@@ -253,13 +395,13 @@
       return;
     }
 
-    resultElement.textContent = entries.map((entry) => `${entry.pass}: ${entry.code.text}`).join("\n");
+    resultElement.textContent = entries.map((entry) => `${styleForPass(entry.pass).label}: ${entry.code.text}`).join("\n");
     for (const entry of entries) {
       const code = entry.code;
       if (typeof recordDecodedScan === "function") {
         recordDecodedScan(code.text);
       }
-      drawResult(code);
+      drawResult(entry);
     }
   }
 
