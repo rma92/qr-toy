@@ -17,14 +17,14 @@
   </head>
   <body>
     <main>
-      <nav class="tabs app-tabs" aria-label="HotQR modes">
-        <button id="tabGenerate" class="tab-button active" type="button" aria-controls="generatePanel">Generate</button>
-        <button id="tabRead" class="tab-button" type="button" aria-controls="readPanel">Read</button>
-        <button id="tabSettings" class="tab-button" type="button" aria-controls="settingsPanel">Settings</button>
-      </nav>
+      <div class="topbar">
+        <nav class="tabs app-tabs" aria-label="HotQR modes">
+          <button id="tabGenerate" class="tab-button active" type="button" aria-controls="generatePanel">Generate</button>
+          <button id="tabRead" class="tab-button" type="button" aria-controls="readPanel">Read</button>
+          <button id="tabSettings" class="tab-button" type="button" aria-controls="settingsPanel">Settings</button>
+        </nav>
 
-      <section id="generatePanel" class="tab-panel active" aria-labelledby="tabGenerate">
-        <div id="toolbar" class="toolbar">
+        <div id="toolbar" class="toolbar gen-actions">
           <button id="buttomImageMode" type="button">Image</button>
           <button id="buttonTextMode" type="button">Text</button>
           <button id="buttonToggleDebug" type="button">Debug</button>
@@ -33,7 +33,9 @@
           <button id="buttonWifi" type="button">Wifi</button>
           <button id="buttonPaste" type="button">Paste</button>
         </div>
+      </div>
 
+      <section id="generatePanel" class="tab-panel active" aria-labelledby="tabGenerate">
         <div id="controlBox" class="control-box">
           <label class="wide-field">
             Text

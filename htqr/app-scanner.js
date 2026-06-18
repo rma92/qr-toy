@@ -7,6 +7,7 @@
   const tabGenerate = document.getElementById("tabGenerate");
   const tabRead = document.getElementById("tabRead");
   const tabSettings = document.getElementById("tabSettings");
+  const genActions = document.getElementById("toolbar");
 
   const cameraSelector = document.getElementById("cameraSelector");
   const focusControl = document.getElementById("focusControl");
@@ -110,6 +111,7 @@
     tabGenerate.setAttribute("aria-selected", String(generating));
     tabRead.setAttribute("aria-selected", String(reading));
     tabSettings.setAttribute("aria-selected", String(settings));
+    genActions.style.display = generating ? "flex" : "none";
 
     if (reading) {
       startScanner();

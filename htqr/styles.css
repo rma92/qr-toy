@@ -51,8 +51,24 @@ button:hover,
   padding: 0.35rem 0.55rem;
 }
 
-.app-tabs {
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+.app-tabs {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.gen-actions {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  border-left: 1px solid #d8ddd7;
+  justify-content: flex-end;
 }
 
 main {
@@ -256,6 +272,11 @@ textarea {
 }
 
 @media (max-width: 700px) {
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .app-tabs {
     width: 100%;
   }
@@ -263,6 +284,14 @@ textarea {
   .tabs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .gen-actions {
+    width: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+    justify-content: flex-start;
   }
 
   .tab-button {
