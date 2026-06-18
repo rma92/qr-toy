@@ -202,7 +202,8 @@ textarea {
 
 #canvas {
   display: block;
-  width: min(98vw, 820px);
+  width: 100%;
+  max-width: 100%;
   height: auto;
   margin-top: 0.75rem;
   border: 2px solid #b03939;
