@@ -16,19 +16,13 @@
     <script src="lzma_worker-min.js"></script>
   </head>
   <body>
-    <header class="app-header">
-      <div>
-        <h1>HotQR</h1>
-        <p>Generate and read HotQR chunks offline.</p>
-      </div>
-      <nav class="tabs" aria-label="HotQR modes">
+    <main>
+      <nav class="tabs app-tabs" aria-label="HotQR modes">
         <button id="tabGenerate" class="tab-button active" type="button" aria-controls="generatePanel">Generate</button>
         <button id="tabRead" class="tab-button" type="button" aria-controls="readPanel">Read</button>
         <button id="tabSettings" class="tab-button" type="button" aria-controls="settingsPanel">Settings</button>
       </nav>
-    </header>
 
-    <main>
       <section id="generatePanel" class="tab-panel active" aria-labelledby="tabGenerate">
         <div id="toolbar" class="toolbar">
           <button id="buttomImageMode" type="button">Image</button>
