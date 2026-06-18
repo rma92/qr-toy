@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="HotQR">
@@ -14,6 +14,22 @@
     <link rel="stylesheet" href="styles.css">
     <script src="qrcodegen-v1.8.0-es6.min.js"></script>
     <script src="lzma_worker-min.js"></script>
+    <script>
+      (function () {
+        function blockPinchZoom(e) {
+          e.preventDefault();
+        }
+
+        document.addEventListener("gesturestart", blockPinchZoom, { passive: false });
+        document.addEventListener("gesturechange", blockPinchZoom, { passive: false });
+        document.addEventListener("gestureend", blockPinchZoom, { passive: false });
+        document.addEventListener("touchmove", function (e) {
+          if (e.touches && e.touches.length > 1) {
+            e.preventDefault();
+          }
+        }, { passive: false });
+      }());
+    </script>
   </head>
   <body>
     <main>
