@@ -236,13 +236,27 @@
     return !isFileScan(parsed) || (debug && debug.checked);
   }
 
-  window.recordDecodedScan = function recordDecodedScan(scan) {
+  function addDecodedScan(scan) {
     const parsed = parseHotQrScan(scan);
     if (shouldStoreRawScan(parsed)) dScans[scan] = "1";
     if (isFileScan(parsed)) {
       addFileScan(parsed);
     }
     szCachedLastScan = scan;
+  }
+
+  window.recordDecodedScan = function recordDecodedScan(scan) {
+    addDecodedScan(scan);
+    processScanData();
+  };
+
+  window.recordDecodedScans = function recordDecodedScans(scans) {
+    const seen = new Set();
+    for (const scan of scans || []) {
+      if (!scan || seen.has(scan)) continue;
+      seen.add(scan);
+      addDecodedScan(scan);
+    }
     processScanData();
   };
 

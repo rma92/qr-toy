@@ -582,15 +582,14 @@ function computeRgbOverlayQrs(qStrR, qStrG, qStrB) {
   const requestedMask = parseInt(document.getElementById('iMask').value, 10);
 
   try {
-    const qrR = generateQr(qStrR, eccStr, minVersion, maxVersion, requestedMask, true);
-    const sharedVersion = qrR.version;
-    const sharedMask = requestedMask >= 0 ? requestedMask : qrR.mask;
-    const qrG = generateQr(qStrG, eccStr, sharedVersion, sharedVersion, sharedMask, true);
-    const qrB = generateQr(qStrB, eccStr, sharedVersion, sharedVersion, sharedMask, true);
+    const initialQrs = qStrings.map((qStr) => generateQr(qStr, eccStr, minVersion, maxVersion, requestedMask, true));
+    const sharedVersion = Math.max(...initialQrs.map((qr) => qr.version));
+    const mask = requestedMask >= 0 ? requestedMask : -1;
+    const qrR = generateQr(qStrR, eccStr, sharedVersion, sharedVersion, mask, true);
+    const qrG = generateQr(qStrG, eccStr, sharedVersion, sharedVersion, mask, true);
+    const qrB = generateQr(qStrB, eccStr, sharedVersion, sharedVersion, mask, true);
     const sameShape = qrR.modules.length === qrG.modules.length &&
-                      qrR.modules.length === qrB.modules.length &&
-                      qrR.mask === qrG.mask &&
-                      qrR.mask === qrB.mask;
+                      qrR.modules.length === qrB.modules.length;
     return sameShape ? [qrR, qrG, qrB] : null;
   } catch (ex) {
     if (bQrSplitterDebug) console.log('RGB overlay compatibility failed: ' + ex);

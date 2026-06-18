@@ -227,6 +227,19 @@
     return 255 - (stretched | 0);
   }
 
+  function rgbChannelSignal(src, i, channelOffset, invert) {
+    const value = src[i + channelOffset];
+    const direct = invert ? value : 255 - value;
+    if (invert) return direct;
+
+    const r = src[i];
+    const g = src[i + 1];
+    const b = src[i + 2];
+    const otherAverage = channelOffset === 0 ? (g + b) / 2 : (channelOffset === 1 ? (r + b) / 2 : (r + g) / 2);
+    const opponent = Math.max(0, Math.min(255, (otherAverage - value) * 2));
+    return Math.max(direct, opponent) | 0;
+  }
+
   function filteredBuffer(src, pass) {
     let out = filterCache[pass];
     if (!out || out.length !== src.length) {
@@ -241,8 +254,7 @@
       const channelOffset = channel === "red" ? 0 : channel === "green" ? 1 : 2;
       const histogram = new Uint32Array(256);
       for (let i = 0; i < src.length; i += 4) {
-        const value = src[i + channelOffset];
-        const signal = invert ? value : 255 - value;
+        const signal = rgbChannelSignal(src, i, channelOffset, invert);
         histogram[signal] += 1;
       }
 
@@ -252,8 +264,7 @@
       if (high <= low) high = percentileFromHistogram(histogram, total, 0.999);
 
       for (let i = 0; i < src.length; i += 4) {
-        const value = src[i + channelOffset];
-        const signal = invert ? value : 255 - value;
+        const signal = rgbChannelSignal(src, i, channelOffset, invert);
         const y = stretchSignalToLuma(signal, low, high);
         out[i] = y;
         out[i + 1] = y;
@@ -396,11 +407,15 @@
     }
 
     resultElement.textContent = entries.map((entry) => `${styleForPass(entry.pass).label}: ${entry.code.text}`).join("\n");
-    for (const entry of entries) {
-      const code = entry.code;
-      if (typeof recordDecodedScan === "function") {
-        recordDecodedScan(code.text);
+    const texts = entries.map((entry) => entry.code && entry.code.text).filter(Boolean);
+    if (typeof recordDecodedScans === "function") {
+      recordDecodedScans(texts);
+    } else {
+      for (const text of texts) {
+        if (typeof recordDecodedScan === "function") recordDecodedScan(text);
       }
+    }
+    for (const entry of entries) {
       drawResult(entry);
     }
   }
