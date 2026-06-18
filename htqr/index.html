@@ -36,6 +36,16 @@
       </div>
 
       <section id="generatePanel" class="tab-panel active" aria-labelledby="tabGenerate">
+        <div id="tabbox" class="output-box">
+          <input id="pageDataOut" size="30" aria-label="Page data">
+          <div id="tab1">
+            <canvas id="cOut" width="1200" height="1200"></canvas>
+          </div>
+          <div id="tab2">
+            <textarea id="textOut"></textarea>
+          </div>
+        </div>
+
         <div id="controlBox" class="control-box">
           <label class="wide-field">
             Text
@@ -143,16 +153,6 @@
             <label>Columns
               <input type="number" id="staticPageTableColumns" value="3" min="1" max="10000">
             </label>
-          </div>
-        </div>
-
-        <div id="tabbox" class="output-box">
-          <input id="pageDataOut" size="30" aria-label="Page data">
-          <div id="tab1">
-            <canvas id="cOut" width="1200" height="1200"></canvas>
-          </div>
-          <div id="tab2">
-            <textarea id="textOut"></textarea>
           </div>
         </div>
       </section>
